@@ -9,6 +9,17 @@ export type AccountRole =
   | "agent_saisie"
   | "nsia";
 
+export type AccountRow = {
+  user_id: string;
+  identifiant: string;
+  display_name: string | null;
+  created_at: string;
+  roles: string[];
+  active: boolean;
+  banned_until: string | null;
+  email: string | null;
+};
+
 const ALLOWED_ROLES: AccountRole[] = [
   "super_admin",
   "admin_anzrbo",
@@ -100,8 +111,9 @@ export const seedInitialAccounts = createServerFn({ method: "POST" }).handler(
 /** Liste des comptes (super_admin uniquement). */
 export const listAccounts = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .handler(async ({ context }) => {
+  .handler(async ({ context }): Promise<AccountRow[]> => {
     await assertSuperAdmin(context.supabase, context.userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
     const { data: idents, error } = await (context.supabase as any)
       .from("app_identifiants")
@@ -118,12 +130,17 @@ export const listAccounts = createServerFn({ method: "GET" })
         (rolesByUser[r.user_id] ??= []).push(r.role);
       }
     }
+    const { data: usersData } = await supabaseAdmin.auth.admin.listUsers({ page: 1, perPage: 1000 });
+    const usersById = new Map((usersData.users ?? []).map((u) => [u.id, u]));
     return (idents ?? []).map((r: any) => ({
       user_id: r.user_id as string,
       identifiant: r.identifiant as string,
       display_name: r.display_name as string | null,
       created_at: r.created_at as string,
       roles: rolesByUser[r.user_id] ?? [],
+      active: !usersById.get(r.user_id)?.banned_until,
+      banned_until: usersById.get(r.user_id)?.banned_until ?? null,
+      email: usersById.get(r.user_id)?.email ?? null,
     }));
   });
 
@@ -181,6 +198,34 @@ export const resetAccountPassword = createServerFn({ method: "POST" })
     await assertSuperAdmin(context.supabase, context.userId);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { error } = await supabaseAdmin.auth.admin.updateUserById(data.user_id, { password: data.password });
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+/** Active ou désactive un compte par identifiant (super_admin uniquement). */
+export const setAccountActive = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: { identifiant: string; active: boolean }) => {
+    if (!data?.identifiant || data.identifiant.trim().length < 3) throw new Error("Identifiant requis");
+    if (typeof data.active !== "boolean") throw new Error("Statut requis");
+    return { identifiant: data.identifiant.trim(), active: data.active };
+  })
+  .handler(async ({ data, context }) => {
+    await assertSuperAdmin(context.supabase, context.userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const { data: row, error: lookupError } = await (supabaseAdmin as any)
+      .from("app_identifiants")
+      .select("user_id")
+      .eq("identifiant", data.identifiant)
+      .maybeSingle();
+    if (lookupError) throw new Error(lookupError.message);
+    if (!row?.user_id) throw new Error("Compte introuvable");
+    if (!data.active && row.user_id === context.userId) throw new Error("Vous ne pouvez pas désactiver votre propre compte");
+
+    const { error } = await supabaseAdmin.auth.admin.updateUserById(row.user_id, {
+      ban_duration: data.active ? "none" : "876000h",
+    });
     if (error) throw new Error(error.message);
     return { ok: true };
   });

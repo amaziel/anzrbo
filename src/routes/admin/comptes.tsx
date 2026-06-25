@@ -14,11 +14,11 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter,
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { UserPlus, KeyRound, Trash2, ShieldCheck } from "lucide-react";
+import { Ban, CheckCircle2, KeyRound, ShieldCheck, Trash2, UserPlus } from "lucide-react";
 import { useAuth, clientRoleGuard } from "@/lib/auth";
 import {
-  listAccounts, createAccount, resetAccountPassword, deleteAccount,
-  type AccountRole,
+  listAccounts, createAccount, resetAccountPassword, deleteAccount, setAccountActive,
+  type AccountRole, type AccountRow,
 } from "@/lib/accounts.functions";
 
 export const Route = createFileRoute("/admin/comptes")({
@@ -27,13 +27,12 @@ export const Route = createFileRoute("/admin/comptes")({
   head: () => ({ meta: [{ title: "Gestion des comptes — DigitOrg" }] }),
 });
 
-type AccountRow = Awaited<ReturnType<typeof listAccounts>>[number];
-
-const ROLE_LABELS: Record<AccountRole, string> = {
+const ROLE_LABELS: Record<string, string> = {
   super_admin: "Super admin (DigitOrg)",
   admin_anzrbo: "Admin ANZRBO",
   agent_saisie: "Délégué ANZRBO",
   nsia: "NSIA",
+  membre: "Membre",
 };
 
 function Page() {
@@ -45,6 +44,7 @@ function Page() {
   const fnCreate = useServerFn(createAccount);
   const fnReset = useServerFn(resetAccountPassword);
   const fnDelete = useServerFn(deleteAccount);
+  const fnSetActive = useServerFn(setAccountActive);
 
   const [rows, setRows] = useState<AccountRow[]>([]);
   const [busy, setBusy] = useState(false);
@@ -81,6 +81,17 @@ function Page() {
     catch (e: any) { toast.error(e?.message ?? "Erreur"); }
   }
 
+  async function onToggleActive(row: AccountRow) {
+    const nextActive = !row.active;
+    const action = nextActive ? "activer" : "désactiver";
+    if (!window.confirm(`Confirmer : ${action} le compte « ${row.identifiant} » ?`)) return;
+    try {
+      await fnSetActive({ data: { identifiant: row.identifiant, active: nextActive } });
+      toast.success(nextActive ? "Compte activé" : "Compte désactivé");
+      await refresh();
+    } catch (e: any) { toast.error(e?.message ?? "Erreur"); }
+  }
+
   async function onDelete(row: AccountRow) {
     if (!window.confirm(`Supprimer définitivement le compte « ${row.identifiant} » ?`)) return;
     try { await fnDelete({ data: { user_id: row.user_id } }); toast.success("Compte supprimé"); await refresh(); }
@@ -97,7 +108,7 @@ function Page() {
           <CardHeader className="flex flex-row items-center justify-between gap-4">
             <div>
               <CardTitle className="flex items-center gap-2"><ShieldCheck className="h-5 w-5 text-primary" /> Comptes administrateurs & délégués</CardTitle>
-              <CardDescription>Connexion exclusivement par identifiant + mot de passe (sans email).</CardDescription>
+              <CardDescription>Création, activation, désactivation et mots de passe par identifiant uniquement.</CardDescription>
             </div>
             <Dialog open={open} onOpenChange={setOpen}>
               <DialogTrigger asChild>
@@ -146,21 +157,33 @@ function Page() {
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead className="text-left text-xs uppercase text-muted-foreground">
-                    <tr><th className="py-2">Identifiant</th><th>Nom</th><th>Rôles</th><th>Créé le</th><th className="text-right">Actions</th></tr>
+                    <tr><th className="py-2">Identifiant</th><th>Nom</th><th>Rôles</th><th>Statut</th><th>Créé le</th><th className="text-right">Actions</th></tr>
                   </thead>
                   <tbody>
                     {rows.map((r) => (
                       <tr key={r.user_id} className="border-t">
                         <td className="py-2 font-mono">{r.identifiant}</td>
                         <td>{r.display_name ?? "—"}</td>
-                        <td className="space-x-1">
+                        <td>
+                          <div className="flex flex-wrap gap-1">
                           {r.roles.length === 0 ? <Badge variant="outline">aucun</Badge>
                             : r.roles.map((role: string) => (
-                                <Badge key={role} variant="secondary">{ROLE_LABELS[role as AccountRole] ?? role}</Badge>
+                                <Badge key={role} variant="secondary">{ROLE_LABELS[role] ?? role}</Badge>
                               ))}
+                          </div>
+                        </td>
+                        <td>
+                          {r.active ? (
+                            <Badge className="gap-1"><CheckCircle2 className="h-3 w-3" /> Actif</Badge>
+                          ) : (
+                            <Badge variant="destructive" className="gap-1"><Ban className="h-3 w-3" /> Désactivé</Badge>
+                          )}
                         </td>
                         <td className="text-muted-foreground">{new Date(r.created_at).toLocaleDateString("fr-FR")}</td>
                         <td className="text-right">
+                          <Button size="sm" variant="ghost" onClick={() => onToggleActive(r)} title={r.active ? "Désactiver" : "Activer"}>
+                            {r.active ? <Ban className="h-4 w-4" /> : <CheckCircle2 className="h-4 w-4" />}
+                          </Button>
                           <Button size="sm" variant="ghost" onClick={() => onReset(r)} title="Réinitialiser le mot de passe">
                             <KeyRound className="h-4 w-4" />
                           </Button>

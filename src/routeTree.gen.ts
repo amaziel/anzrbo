@@ -10,7 +10,6 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
-import { Route as SeedInitRouteImport } from './routes/seed-init'
 import { Route as ScannerRouteImport } from './routes/scanner'
 import { Route as NsiaRouteImport } from './routes/nsia'
 import { Route as LoginRouteImport } from './routes/login'
@@ -35,11 +34,6 @@ import { Route as AdminMembresNouveauRouteImport } from './routes/admin/membres.
 const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
   id: '/sitemap.xml',
   path: '/sitemap.xml',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const SeedInitRoute = SeedInitRouteImport.update({
-  id: '/seed-init',
-  path: '/seed-init',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ScannerRoute = ScannerRouteImport.update({
@@ -152,7 +146,6 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/nsia': typeof NsiaRoute
   '/scanner': typeof ScannerRoute
-  '/seed-init': typeof SeedInitRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/admin/assistances': typeof AdminAssistancesRoute
   '/admin/comptes': typeof AdminComptesRoute
@@ -176,7 +169,6 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/nsia': typeof NsiaRoute
   '/scanner': typeof ScannerRoute
-  '/seed-init': typeof SeedInitRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/admin/assistances': typeof AdminAssistancesRoute
   '/admin/comptes': typeof AdminComptesRoute
@@ -200,7 +192,6 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/nsia': typeof NsiaRoute
   '/scanner': typeof ScannerRoute
-  '/seed-init': typeof SeedInitRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/admin/assistances': typeof AdminAssistancesRoute
   '/admin/comptes': typeof AdminComptesRoute
@@ -226,7 +217,6 @@ export interface FileRouteTypes {
     | '/login'
     | '/nsia'
     | '/scanner'
-    | '/seed-init'
     | '/sitemap.xml'
     | '/admin/assistances'
     | '/admin/comptes'
@@ -250,7 +240,6 @@ export interface FileRouteTypes {
     | '/login'
     | '/nsia'
     | '/scanner'
-    | '/seed-init'
     | '/sitemap.xml'
     | '/admin/assistances'
     | '/admin/comptes'
@@ -273,7 +262,6 @@ export interface FileRouteTypes {
     | '/login'
     | '/nsia'
     | '/scanner'
-    | '/seed-init'
     | '/sitemap.xml'
     | '/admin/assistances'
     | '/admin/comptes'
@@ -298,7 +286,6 @@ export interface RootRouteChildren {
   LoginRoute: typeof LoginRoute
   NsiaRoute: typeof NsiaRoute
   ScannerRoute: typeof ScannerRoute
-  SeedInitRoute: typeof SeedInitRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
   AdminAssistancesRoute: typeof AdminAssistancesRoute
   AdminComptesRoute: typeof AdminComptesRoute
@@ -319,13 +306,6 @@ declare module '@tanstack/react-router' {
       path: '/sitemap.xml'
       fullPath: '/sitemap.xml'
       preLoaderRoute: typeof SitemapDotxmlRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/seed-init': {
-      id: '/seed-init'
-      path: '/seed-init'
-      fullPath: '/seed-init'
-      preLoaderRoute: typeof SeedInitRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/scanner': {
@@ -494,7 +474,6 @@ const rootRouteChildren: RootRouteChildren = {
   LoginRoute: LoginRoute,
   NsiaRoute: NsiaRoute,
   ScannerRoute: ScannerRoute,
-  SeedInitRoute: SeedInitRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,
   AdminAssistancesRoute: AdminAssistancesRoute,
   AdminComptesRoute: AdminComptesRoute,
