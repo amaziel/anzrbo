@@ -155,7 +155,7 @@ function Page() {
                         <td>{r.display_name ?? "—"}</td>
                         <td className="space-x-1">
                           {r.roles.length === 0 ? <Badge variant="outline">aucun</Badge>
-                            : r.roles.map((role) => (
+                            : r.roles.map((role: string) => (
                                 <Badge key={role} variant="secondary">{ROLE_LABELS[role as AccountRole] ?? role}</Badge>
                               ))}
                         </td>
