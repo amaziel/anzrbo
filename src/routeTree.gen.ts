@@ -9,38 +9,341 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
+import { Route as ScannerRouteImport } from './routes/scanner'
+import { Route as NsiaRouteImport } from './routes/nsia'
+import { Route as LoginRouteImport } from './routes/login'
+import { Route as FaqRouteImport } from './routes/faq'
+import { Route as DigitorgRouteImport } from './routes/digitorg'
+import { Route as ContactRouteImport } from './routes/contact'
+import { Route as CarteRouteImport } from './routes/carte'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AdminIndexRouteImport } from './routes/admin/index'
+import { Route as VerifierTelephoneRouteImport } from './routes/verifier.$telephone'
+import { Route as GuideProcedureDecesRouteImport } from './routes/guide.procedure-deces'
+import { Route as AdminNsiaRouteImport } from './routes/admin/nsia'
+import { Route as AdminDiagnosticsRouteImport } from './routes/admin/diagnostics'
+import { Route as AdminCotisationsRouteImport } from './routes/admin/cotisations'
+import { Route as AdminAssistancesRouteImport } from './routes/admin/assistances'
+import { Route as AdminNsiaIndexRouteImport } from './routes/admin/nsia.index'
+import { Route as AdminMembresIndexRouteImport } from './routes/admin/membres.index'
+import { Route as AdminNsiaNouveauRouteImport } from './routes/admin/nsia.nouveau'
+import { Route as AdminMembresNouveauRouteImport } from './routes/admin/membres.nouveau'
 
+const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
+  id: '/sitemap.xml',
+  path: '/sitemap.xml',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ScannerRoute = ScannerRouteImport.update({
+  id: '/scanner',
+  path: '/scanner',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const NsiaRoute = NsiaRouteImport.update({
+  id: '/nsia',
+  path: '/nsia',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const FaqRoute = FaqRouteImport.update({
+  id: '/faq',
+  path: '/faq',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DigitorgRoute = DigitorgRouteImport.update({
+  id: '/digitorg',
+  path: '/digitorg',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ContactRoute = ContactRouteImport.update({
+  id: '/contact',
+  path: '/contact',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CarteRoute = CarteRouteImport.update({
+  id: '/carte',
+  path: '/carte',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminIndexRoute = AdminIndexRouteImport.update({
+  id: '/admin/',
+  path: '/admin/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const VerifierTelephoneRoute = VerifierTelephoneRouteImport.update({
+  id: '/verifier/$telephone',
+  path: '/verifier/$telephone',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const GuideProcedureDecesRoute = GuideProcedureDecesRouteImport.update({
+  id: '/guide/procedure-deces',
+  path: '/guide/procedure-deces',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminNsiaRoute = AdminNsiaRouteImport.update({
+  id: '/admin/nsia',
+  path: '/admin/nsia',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminDiagnosticsRoute = AdminDiagnosticsRouteImport.update({
+  id: '/admin/diagnostics',
+  path: '/admin/diagnostics',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminCotisationsRoute = AdminCotisationsRouteImport.update({
+  id: '/admin/cotisations',
+  path: '/admin/cotisations',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminAssistancesRoute = AdminAssistancesRouteImport.update({
+  id: '/admin/assistances',
+  path: '/admin/assistances',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminNsiaIndexRoute = AdminNsiaIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AdminNsiaRoute,
+} as any)
+const AdminMembresIndexRoute = AdminMembresIndexRouteImport.update({
+  id: '/admin/membres/',
+  path: '/admin/membres/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminNsiaNouveauRoute = AdminNsiaNouveauRouteImport.update({
+  id: '/nouveau',
+  path: '/nouveau',
+  getParentRoute: () => AdminNsiaRoute,
+} as any)
+const AdminMembresNouveauRoute = AdminMembresNouveauRouteImport.update({
+  id: '/admin/membres/nouveau',
+  path: '/admin/membres/nouveau',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/carte': typeof CarteRoute
+  '/contact': typeof ContactRoute
+  '/digitorg': typeof DigitorgRoute
+  '/faq': typeof FaqRoute
+  '/login': typeof LoginRoute
+  '/nsia': typeof NsiaRoute
+  '/scanner': typeof ScannerRoute
+  '/sitemap.xml': typeof SitemapDotxmlRoute
+  '/admin/assistances': typeof AdminAssistancesRoute
+  '/admin/cotisations': typeof AdminCotisationsRoute
+  '/admin/diagnostics': typeof AdminDiagnosticsRoute
+  '/admin/nsia': typeof AdminNsiaRouteWithChildren
+  '/guide/procedure-deces': typeof GuideProcedureDecesRoute
+  '/verifier/$telephone': typeof VerifierTelephoneRoute
+  '/admin/': typeof AdminIndexRoute
+  '/admin/membres/nouveau': typeof AdminMembresNouveauRoute
+  '/admin/nsia/nouveau': typeof AdminNsiaNouveauRoute
+  '/admin/membres/': typeof AdminMembresIndexRoute
+  '/admin/nsia/': typeof AdminNsiaIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/carte': typeof CarteRoute
+  '/contact': typeof ContactRoute
+  '/digitorg': typeof DigitorgRoute
+  '/faq': typeof FaqRoute
+  '/login': typeof LoginRoute
+  '/nsia': typeof NsiaRoute
+  '/scanner': typeof ScannerRoute
+  '/sitemap.xml': typeof SitemapDotxmlRoute
+  '/admin/assistances': typeof AdminAssistancesRoute
+  '/admin/cotisations': typeof AdminCotisationsRoute
+  '/admin/diagnostics': typeof AdminDiagnosticsRoute
+  '/guide/procedure-deces': typeof GuideProcedureDecesRoute
+  '/verifier/$telephone': typeof VerifierTelephoneRoute
+  '/admin': typeof AdminIndexRoute
+  '/admin/membres/nouveau': typeof AdminMembresNouveauRoute
+  '/admin/nsia/nouveau': typeof AdminNsiaNouveauRoute
+  '/admin/membres': typeof AdminMembresIndexRoute
+  '/admin/nsia': typeof AdminNsiaIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/carte': typeof CarteRoute
+  '/contact': typeof ContactRoute
+  '/digitorg': typeof DigitorgRoute
+  '/faq': typeof FaqRoute
+  '/login': typeof LoginRoute
+  '/nsia': typeof NsiaRoute
+  '/scanner': typeof ScannerRoute
+  '/sitemap.xml': typeof SitemapDotxmlRoute
+  '/admin/assistances': typeof AdminAssistancesRoute
+  '/admin/cotisations': typeof AdminCotisationsRoute
+  '/admin/diagnostics': typeof AdminDiagnosticsRoute
+  '/admin/nsia': typeof AdminNsiaRouteWithChildren
+  '/guide/procedure-deces': typeof GuideProcedureDecesRoute
+  '/verifier/$telephone': typeof VerifierTelephoneRoute
+  '/admin/': typeof AdminIndexRoute
+  '/admin/membres/nouveau': typeof AdminMembresNouveauRoute
+  '/admin/nsia/nouveau': typeof AdminNsiaNouveauRoute
+  '/admin/membres/': typeof AdminMembresIndexRoute
+  '/admin/nsia/': typeof AdminNsiaIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths:
+    | '/'
+    | '/carte'
+    | '/contact'
+    | '/digitorg'
+    | '/faq'
+    | '/login'
+    | '/nsia'
+    | '/scanner'
+    | '/sitemap.xml'
+    | '/admin/assistances'
+    | '/admin/cotisations'
+    | '/admin/diagnostics'
+    | '/admin/nsia'
+    | '/guide/procedure-deces'
+    | '/verifier/$telephone'
+    | '/admin/'
+    | '/admin/membres/nouveau'
+    | '/admin/nsia/nouveau'
+    | '/admin/membres/'
+    | '/admin/nsia/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to:
+    | '/'
+    | '/carte'
+    | '/contact'
+    | '/digitorg'
+    | '/faq'
+    | '/login'
+    | '/nsia'
+    | '/scanner'
+    | '/sitemap.xml'
+    | '/admin/assistances'
+    | '/admin/cotisations'
+    | '/admin/diagnostics'
+    | '/guide/procedure-deces'
+    | '/verifier/$telephone'
+    | '/admin'
+    | '/admin/membres/nouveau'
+    | '/admin/nsia/nouveau'
+    | '/admin/membres'
+    | '/admin/nsia'
+  id:
+    | '__root__'
+    | '/'
+    | '/carte'
+    | '/contact'
+    | '/digitorg'
+    | '/faq'
+    | '/login'
+    | '/nsia'
+    | '/scanner'
+    | '/sitemap.xml'
+    | '/admin/assistances'
+    | '/admin/cotisations'
+    | '/admin/diagnostics'
+    | '/admin/nsia'
+    | '/guide/procedure-deces'
+    | '/verifier/$telephone'
+    | '/admin/'
+    | '/admin/membres/nouveau'
+    | '/admin/nsia/nouveau'
+    | '/admin/membres/'
+    | '/admin/nsia/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  CarteRoute: typeof CarteRoute
+  ContactRoute: typeof ContactRoute
+  DigitorgRoute: typeof DigitorgRoute
+  FaqRoute: typeof FaqRoute
+  LoginRoute: typeof LoginRoute
+  NsiaRoute: typeof NsiaRoute
+  ScannerRoute: typeof ScannerRoute
+  SitemapDotxmlRoute: typeof SitemapDotxmlRoute
+  AdminAssistancesRoute: typeof AdminAssistancesRoute
+  AdminCotisationsRoute: typeof AdminCotisationsRoute
+  AdminDiagnosticsRoute: typeof AdminDiagnosticsRoute
+  AdminNsiaRoute: typeof AdminNsiaRouteWithChildren
+  GuideProcedureDecesRoute: typeof GuideProcedureDecesRoute
+  VerifierTelephoneRoute: typeof VerifierTelephoneRoute
+  AdminIndexRoute: typeof AdminIndexRoute
+  AdminMembresNouveauRoute: typeof AdminMembresNouveauRoute
+  AdminMembresIndexRoute: typeof AdminMembresIndexRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/sitemap.xml': {
+      id: '/sitemap.xml'
+      path: '/sitemap.xml'
+      fullPath: '/sitemap.xml'
+      preLoaderRoute: typeof SitemapDotxmlRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/scanner': {
+      id: '/scanner'
+      path: '/scanner'
+      fullPath: '/scanner'
+      preLoaderRoute: typeof ScannerRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/nsia': {
+      id: '/nsia'
+      path: '/nsia'
+      fullPath: '/nsia'
+      preLoaderRoute: typeof NsiaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/faq': {
+      id: '/faq'
+      path: '/faq'
+      fullPath: '/faq'
+      preLoaderRoute: typeof FaqRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/digitorg': {
+      id: '/digitorg'
+      path: '/digitorg'
+      fullPath: '/digitorg'
+      preLoaderRoute: typeof DigitorgRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/contact': {
+      id: '/contact'
+      path: '/contact'
+      fullPath: '/contact'
+      preLoaderRoute: typeof ContactRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/carte': {
+      id: '/carte'
+      path: '/carte'
+      fullPath: '/carte'
+      preLoaderRoute: typeof CarteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -48,11 +351,119 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin/': {
+      id: '/admin/'
+      path: '/admin'
+      fullPath: '/admin/'
+      preLoaderRoute: typeof AdminIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/verifier/$telephone': {
+      id: '/verifier/$telephone'
+      path: '/verifier/$telephone'
+      fullPath: '/verifier/$telephone'
+      preLoaderRoute: typeof VerifierTelephoneRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/guide/procedure-deces': {
+      id: '/guide/procedure-deces'
+      path: '/guide/procedure-deces'
+      fullPath: '/guide/procedure-deces'
+      preLoaderRoute: typeof GuideProcedureDecesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin/nsia': {
+      id: '/admin/nsia'
+      path: '/admin/nsia'
+      fullPath: '/admin/nsia'
+      preLoaderRoute: typeof AdminNsiaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin/diagnostics': {
+      id: '/admin/diagnostics'
+      path: '/admin/diagnostics'
+      fullPath: '/admin/diagnostics'
+      preLoaderRoute: typeof AdminDiagnosticsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin/cotisations': {
+      id: '/admin/cotisations'
+      path: '/admin/cotisations'
+      fullPath: '/admin/cotisations'
+      preLoaderRoute: typeof AdminCotisationsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin/assistances': {
+      id: '/admin/assistances'
+      path: '/admin/assistances'
+      fullPath: '/admin/assistances'
+      preLoaderRoute: typeof AdminAssistancesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin/nsia/': {
+      id: '/admin/nsia/'
+      path: '/'
+      fullPath: '/admin/nsia/'
+      preLoaderRoute: typeof AdminNsiaIndexRouteImport
+      parentRoute: typeof AdminNsiaRoute
+    }
+    '/admin/membres/': {
+      id: '/admin/membres/'
+      path: '/admin/membres'
+      fullPath: '/admin/membres/'
+      preLoaderRoute: typeof AdminMembresIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin/nsia/nouveau': {
+      id: '/admin/nsia/nouveau'
+      path: '/nouveau'
+      fullPath: '/admin/nsia/nouveau'
+      preLoaderRoute: typeof AdminNsiaNouveauRouteImport
+      parentRoute: typeof AdminNsiaRoute
+    }
+    '/admin/membres/nouveau': {
+      id: '/admin/membres/nouveau'
+      path: '/admin/membres/nouveau'
+      fullPath: '/admin/membres/nouveau'
+      preLoaderRoute: typeof AdminMembresNouveauRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
+interface AdminNsiaRouteChildren {
+  AdminNsiaNouveauRoute: typeof AdminNsiaNouveauRoute
+  AdminNsiaIndexRoute: typeof AdminNsiaIndexRoute
+}
+
+const AdminNsiaRouteChildren: AdminNsiaRouteChildren = {
+  AdminNsiaNouveauRoute: AdminNsiaNouveauRoute,
+  AdminNsiaIndexRoute: AdminNsiaIndexRoute,
+}
+
+const AdminNsiaRouteWithChildren = AdminNsiaRoute._addFileChildren(
+  AdminNsiaRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  CarteRoute: CarteRoute,
+  ContactRoute: ContactRoute,
+  DigitorgRoute: DigitorgRoute,
+  FaqRoute: FaqRoute,
+  LoginRoute: LoginRoute,
+  NsiaRoute: NsiaRoute,
+  ScannerRoute: ScannerRoute,
+  SitemapDotxmlRoute: SitemapDotxmlRoute,
+  AdminAssistancesRoute: AdminAssistancesRoute,
+  AdminCotisationsRoute: AdminCotisationsRoute,
+  AdminDiagnosticsRoute: AdminDiagnosticsRoute,
+  AdminNsiaRoute: AdminNsiaRouteWithChildren,
+  GuideProcedureDecesRoute: GuideProcedureDecesRoute,
+  VerifierTelephoneRoute: VerifierTelephoneRoute,
+  AdminIndexRoute: AdminIndexRoute,
+  AdminMembresNouveauRoute: AdminMembresNouveauRoute,
+  AdminMembresIndexRoute: AdminMembresIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

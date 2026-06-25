@@ -1,0 +1,13 @@
+# ANZRBO — Association des N'Zipris Résidents à Bonon
+
+> Plateforme officielle de l'ANZRBO : entraide, assistance au décès et solidarité des N'Zipris résidents à Bonon, Côte d'Ivoire.
+
+L'ANZRBO organise la solidarité de ses membres autour de cotisations encadrées (1 200 FCFA par décès déclaré) et du versement d'une assistance de 500 000 FCFA à la famille du défunt. La plateforme gère les membres, les cotisations, les assistances, le partenariat NSIA Décès, ainsi que la vérification publique d'un membre par numéro de téléphone ou QR Code.
+
+## Pages
+
+- [Accueil](/): Présentation de l'association, missions et fonctionnement de la solidarité.
+- [Guide procédure décès](/guide/procedure-deces): Étapes de déclaration d'un décès, dossier, cotisation solidaire, assistance ANZRBO et suivi NSIA.
+- [Foire aux questions](/faq): Réponses aux questions courantes sur l'adhésion, les cotisations et la vérification d'un membre.
+- [Contact](/contact): Coordonnées de l'association et formulaire de contact.
+- [Scanner QR](/scanner): Vérification publique d'un membre par scan de QR Code.
