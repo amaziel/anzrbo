@@ -97,7 +97,9 @@ async function loadCurrentUser(): Promise<LocalUser | null> {
   // public.user_roles is RLS-protected: `auth.uid() = user_id` for SELECT.
   // The query therefore returns only this user's roles, even if the table
   // were exposed by mistake — no enumeration risk.
-  const { data: roleRows, error: roleErr } = await supabase
+  // Types for public.* aren't generated in this project, so cast through
+  // `any` for the table reference only. RLS still enforces row scoping.
+  const { data: roleRows, error: roleErr } = await (supabase as any)
     .from("user_roles")
     .select("role")
     .eq("user_id", authUser.id);
@@ -107,7 +109,7 @@ async function loadCurrentUser(): Promise<LocalUser | null> {
     return null;
   }
 
-  const dbRoles = (roleRows ?? []).map((r) => r.role as DbRole);
+  const dbRoles = ((roleRows ?? []) as Array<{ role: string }>).map((r) => r.role as DbRole);
   const appRoles = deriveAppRoles(dbRoles);
   const primary = pickPrimary(appRoles);
   if (!primary) return null;
