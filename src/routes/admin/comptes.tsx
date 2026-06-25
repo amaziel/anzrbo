@@ -27,11 +27,12 @@ export const Route = createFileRoute("/admin/comptes")({
   head: () => ({ meta: [{ title: "Gestion des comptes — DigitOrg" }] }),
 });
 
-const ROLE_LABELS: Record<AccountRole, string> = {
+const ROLE_LABELS: Record<string, string> = {
   super_admin: "Super admin (DigitOrg)",
   admin_anzrbo: "Admin ANZRBO",
   agent_saisie: "Délégué ANZRBO",
   nsia: "NSIA",
+  membre: "Membre",
 };
 
 function Page() {
@@ -163,11 +164,13 @@ function Page() {
                       <tr key={r.user_id} className="border-t">
                         <td className="py-2 font-mono">{r.identifiant}</td>
                         <td>{r.display_name ?? "—"}</td>
-                        <td className="space-x-1">
+                        <td>
+                          <div className="flex flex-wrap gap-1">
                           {r.roles.length === 0 ? <Badge variant="outline">aucun</Badge>
                             : r.roles.map((role: string) => (
-                                <Badge key={role} variant="secondary">{ROLE_LABELS[role as AccountRole] ?? role}</Badge>
+                                <Badge key={role} variant="secondary">{ROLE_LABELS[role] ?? role}</Badge>
                               ))}
+                          </div>
                         </td>
                         <td>
                           {r.active ? (
