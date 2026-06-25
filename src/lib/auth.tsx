@@ -1,3 +1,4 @@
+import { redirect } from "@tanstack/react-router";
 import { createContext, useContext, useEffect, useRef, useState, ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -144,11 +145,11 @@ async function loadCurrentUser(): Promise<LocalUser | null> {
 // when we KNOW the user does not have access; returns undefined while the
 // session is still resolving so the route can mount and the component-level
 // effect can render a loading state / redirect once `loading` flips false.
-export function clientRoleGuard(allowed: Role[]): { to: "/login" } | undefined {
+export function clientRoleGuard(allowed: Role[]): ReturnType<typeof redirect> | undefined {
   if (cachedUser === undefined) return undefined; // unknown → let the route load
-  if (!cachedUser) return { to: "/login" };
+  if (!cachedUser) return redirect({ to: "/login" });
   const ok = cachedUser.roles.some((r) => allowed.includes(r));
-  return ok ? undefined : { to: "/login" };
+  return ok ? undefined : redirect({ to: "/login" });
 }
 
 type Ctx = {
