@@ -76,7 +76,9 @@ export const ADMIN_NAV: NavItem[] = [
   { to: "/admin/cotisations", label: "Cotisations" },
   { to: "/admin/assistances", label: "Assistances" },
   { to: "/admin/nsia", label: "NSIA" },
+  { to: "/admin/comptes", label: "Comptes" },
 ];
+
 
 export const DIGITORG_NAV: NavItem[] = [
   { to: "/digitorg", label: "Pilotage DigitOrg" },
