@@ -9,6 +9,8 @@ export type Role = "admin_anzrbo" | "digitorg" | "nsia";
 // the generated Supabase types in this project don't expose the public schema.
 type DbRole =
   | "super_admin"
+  | "admin_anzrbo"
+  | "admin_nsia"
   | "admin_national"
   | "president"
   | "tresorier_national"
@@ -20,6 +22,9 @@ type DbRole =
   | "comite_controle"
   | "conseil_sages"
   | "delegue_section"
+  | "agent_saisie"
+  | "imprimeur"
+  | "tresorier"
   | "nsia"
   | "member"
   | "membre";
@@ -40,12 +45,16 @@ export type LocalUser = {
 // for actual data access — this map only decides which dashboards are shown.
 const DB_ROLE_TO_APP: Partial<Record<DbRole, Role[]>> = {
   super_admin: ["admin_anzrbo", "digitorg", "nsia"],
+  admin_anzrbo: ["admin_anzrbo"],
   admin_national: ["admin_anzrbo"],
+  agent_saisie: ["admin_anzrbo"],
   president: ["admin_anzrbo"],
   tresorier_national: ["admin_anzrbo"],
+  tresorier: ["admin_anzrbo"],
   secretaire_general: ["admin_anzrbo"],
   directeur_executif: ["admin_anzrbo"],
   delegue_section: ["admin_anzrbo"],
+  admin_nsia: ["nsia"],
   nsia: ["nsia"],
 };
 
