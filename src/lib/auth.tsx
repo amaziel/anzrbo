@@ -20,8 +20,10 @@ type DbRole =
   | "comite_controle"
   | "conseil_sages"
   | "delegue_section"
+  | "nsia"
   | "member"
   | "membre";
+
 
 export type LocalUser = {
   id: string;            // auth.users.id
@@ -43,7 +45,10 @@ const DB_ROLE_TO_APP: Partial<Record<DbRole, Role[]>> = {
   tresorier_national: ["admin_anzrbo"],
   secretaire_general: ["admin_anzrbo"],
   directeur_executif: ["admin_anzrbo"],
+  delegue_section: ["admin_anzrbo"],
+  nsia: ["nsia"],
 };
+
 
 const ROLE_HOME: Record<Role, "/admin" | "/digitorg" | "/nsia"> = {
   admin_anzrbo: "/admin",
@@ -192,22 +197,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         user,
         loading,
         signIn: async (identifier, password) => {
-          // The identifier MUST be an e-mail. We no longer resolve phone
-          // numbers to e-mails server-side (that RPC was removed because
-          // it enabled unauthenticated account enumeration).
-          const email = identifier.trim();
+          // L'utilisateur saisit un IDENTIFIANT (jamais un email).
+          // Une RPC SECURITY DEFINER convertit l'identifiant en email interne
+          // (réponse constante anti-énumération). On signe ensuite via Supabase Auth.
+          const id = identifier.trim();
+          const { data: email, error: rpcErr } = await (supabase as any).rpc(
+            "resolve_identifier_to_email",
+            { p_identifier: id },
+          );
+          if (rpcErr || typeof email !== "string") return null;
           const { error } = await supabase.auth.signInWithPassword({ email, password });
           if (error) return null;
           const u = await loadCurrentUser();
           cachedUser = u;
           setUser(u);
           if (!u) {
-            // Signed in but no recognized admin role → terminate session.
             await supabase.auth.signOut();
             return null;
           }
           return u;
         },
+
         signOut: async () => {
           try {
             await supabase.auth.signOut();
