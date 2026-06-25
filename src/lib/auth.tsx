@@ -1,12 +1,27 @@
 import { createContext, useContext, useEffect, useRef, useState, ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import type { Database } from "@/integrations/supabase/types";
 
 // Front-end permission buckets. Multiple database roles can map to the same
 // bucket — see DB_ROLE_TO_APP below.
 export type Role = "admin_anzrbo" | "digitorg" | "nsia";
 
-type DbRole = Database["public"]["Enums"]["app_role"];
+// Database role names (public.app_role). Kept as a plain string union because
+// the generated Supabase types in this project don't expose the public schema.
+type DbRole =
+  | "super_admin"
+  | "admin_national"
+  | "president"
+  | "tresorier_national"
+  | "secretaire_general"
+  | "directeur_executif"
+  | "commissaire_comptes"
+  | "secretaire_regional"
+  | "tresorier_regional"
+  | "comite_controle"
+  | "conseil_sages"
+  | "delegue_section"
+  | "member"
+  | "membre";
 
 export type LocalUser = {
   id: string;            // auth.users.id
