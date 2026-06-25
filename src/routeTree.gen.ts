@@ -24,6 +24,7 @@ import { Route as GuideProcedureDecesRouteImport } from './routes/guide.procedur
 import { Route as AdminNsiaRouteImport } from './routes/admin/nsia'
 import { Route as AdminDiagnosticsRouteImport } from './routes/admin/diagnostics'
 import { Route as AdminCotisationsRouteImport } from './routes/admin/cotisations'
+import { Route as AdminComptesRouteImport } from './routes/admin/comptes'
 import { Route as AdminAssistancesRouteImport } from './routes/admin/assistances'
 import { Route as AdminNsiaIndexRouteImport } from './routes/admin/nsia.index'
 import { Route as AdminMembresIndexRouteImport } from './routes/admin/membres.index'
@@ -105,6 +106,11 @@ const AdminCotisationsRoute = AdminCotisationsRouteImport.update({
   path: '/admin/cotisations',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminComptesRoute = AdminComptesRouteImport.update({
+  id: '/admin/comptes',
+  path: '/admin/comptes',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AdminAssistancesRoute = AdminAssistancesRouteImport.update({
   id: '/admin/assistances',
   path: '/admin/assistances',
@@ -142,6 +148,7 @@ export interface FileRoutesByFullPath {
   '/scanner': typeof ScannerRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/admin/assistances': typeof AdminAssistancesRoute
+  '/admin/comptes': typeof AdminComptesRoute
   '/admin/cotisations': typeof AdminCotisationsRoute
   '/admin/diagnostics': typeof AdminDiagnosticsRoute
   '/admin/nsia': typeof AdminNsiaRouteWithChildren
@@ -164,6 +171,7 @@ export interface FileRoutesByTo {
   '/scanner': typeof ScannerRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/admin/assistances': typeof AdminAssistancesRoute
+  '/admin/comptes': typeof AdminComptesRoute
   '/admin/cotisations': typeof AdminCotisationsRoute
   '/admin/diagnostics': typeof AdminDiagnosticsRoute
   '/guide/procedure-deces': typeof GuideProcedureDecesRoute
@@ -186,6 +194,7 @@ export interface FileRoutesById {
   '/scanner': typeof ScannerRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/admin/assistances': typeof AdminAssistancesRoute
+  '/admin/comptes': typeof AdminComptesRoute
   '/admin/cotisations': typeof AdminCotisationsRoute
   '/admin/diagnostics': typeof AdminDiagnosticsRoute
   '/admin/nsia': typeof AdminNsiaRouteWithChildren
@@ -210,6 +219,7 @@ export interface FileRouteTypes {
     | '/scanner'
     | '/sitemap.xml'
     | '/admin/assistances'
+    | '/admin/comptes'
     | '/admin/cotisations'
     | '/admin/diagnostics'
     | '/admin/nsia'
@@ -232,6 +242,7 @@ export interface FileRouteTypes {
     | '/scanner'
     | '/sitemap.xml'
     | '/admin/assistances'
+    | '/admin/comptes'
     | '/admin/cotisations'
     | '/admin/diagnostics'
     | '/guide/procedure-deces'
@@ -253,6 +264,7 @@ export interface FileRouteTypes {
     | '/scanner'
     | '/sitemap.xml'
     | '/admin/assistances'
+    | '/admin/comptes'
     | '/admin/cotisations'
     | '/admin/diagnostics'
     | '/admin/nsia'
@@ -276,6 +288,7 @@ export interface RootRouteChildren {
   ScannerRoute: typeof ScannerRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
   AdminAssistancesRoute: typeof AdminAssistancesRoute
+  AdminComptesRoute: typeof AdminComptesRoute
   AdminCotisationsRoute: typeof AdminCotisationsRoute
   AdminDiagnosticsRoute: typeof AdminDiagnosticsRoute
   AdminNsiaRoute: typeof AdminNsiaRouteWithChildren
@@ -393,6 +406,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminCotisationsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin/comptes': {
+      id: '/admin/comptes'
+      path: '/admin/comptes'
+      fullPath: '/admin/comptes'
+      preLoaderRoute: typeof AdminComptesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/admin/assistances': {
       id: '/admin/assistances'
       path: '/admin/assistances'
@@ -456,6 +476,7 @@ const rootRouteChildren: RootRouteChildren = {
   ScannerRoute: ScannerRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,
   AdminAssistancesRoute: AdminAssistancesRoute,
+  AdminComptesRoute: AdminComptesRoute,
   AdminCotisationsRoute: AdminCotisationsRoute,
   AdminDiagnosticsRoute: AdminDiagnosticsRoute,
   AdminNsiaRoute: AdminNsiaRouteWithChildren,
