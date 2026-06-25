@@ -60,11 +60,11 @@ function Page() {
                 </div>
               )}
               <div>
-                <Label htmlFor="identifier">Identifiant</Label>
+                <Label htmlFor="identifier">Adresse e-mail</Label>
                 <Input
-                  id="identifier" type="text" required value={identifier}
+                  id="identifier" type="email" required value={identifier}
                   onChange={(e) => { setIdentifier(e.target.value); if (errorMsg) setErrorMsg(null); }}
-                  placeholder="Téléphone ou identifiant" autoComplete="username"
+                  placeholder="prenom.nom@exemple.ci" autoComplete="username"
                 />
               </div>
               <div>

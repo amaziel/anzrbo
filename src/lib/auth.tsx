@@ -1,94 +1,123 @@
-import { createContext, useContext, useEffect, useState, ReactNode } from "react";
+import { createContext, useContext, useEffect, useRef, useState, ReactNode } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import type { Database } from "@/integrations/supabase/types";
 
-// Authentification locale (démonstration). Les mots de passe ne sont jamais
-// stockés en clair dans le bundle : seul leur condensé SHA-256 est embarqué.
-// IMPORTANT : ce schéma reste purement client-side et NE doit pas être
-// considéré comme une protection de sécurité en production. Pour un usage
-// réel, migrer vers Supabase Auth (ou équivalent) avec validation serveur.
-
+// Front-end permission buckets. Multiple database roles can map to the same
+// bucket — see DB_ROLE_TO_APP below.
 export type Role = "admin_anzrbo" | "digitorg" | "nsia";
 
+type DbRole = Database["public"]["Enums"]["app_role"];
+
 export type LocalUser = {
-  id: string;
-  identifier: string;
+  id: string;            // auth.users.id
+  identifier: string;    // email (display only)
   nom: string;
   prenoms: string;
-  role: Role;
+  role: Role;            // primary front-end role
+  roles: Role[];         // every front-end role the user holds
   home: "/admin" | "/digitorg" | "/nsia";
 };
 
-type Account = LocalUser & { passwordHash: string };
+// Mapping from database roles (public.app_role) to the front-end permission
+// buckets the UI knows about. Server-side RLS remains the source of truth
+// for actual data access — this map only decides which dashboards are shown.
+const DB_ROLE_TO_APP: Partial<Record<DbRole, Role[]>> = {
+  super_admin: ["admin_anzrbo", "digitorg", "nsia"],
+  admin_national: ["admin_anzrbo"],
+  president: ["admin_anzrbo"],
+  tresorier_national: ["admin_anzrbo"],
+  secretaire_general: ["admin_anzrbo"],
+  directeur_executif: ["admin_anzrbo"],
+};
 
-const STORAGE_KEY = "anzrbo_local_session_v2";
+const ROLE_HOME: Record<Role, "/admin" | "/digitorg" | "/nsia"> = {
+  admin_anzrbo: "/admin",
+  digitorg: "/digitorg",
+  nsia: "/nsia",
+};
 
-// Condensé d'un mot de passe partagé entre les comptes de démonstration.
-// La valeur en clair n'est PAS documentée ici et doit être communiquée
-// hors-bande par l'administrateur. Pour la production, migrer vers Supabase
-// Auth avec vérification serveur (par-utilisateur, salt + bcrypt/argon2).
-const DEMO_PWD_HASH =
-  (import.meta.env.VITE_ANZRBO_DEMO_PWD_HASH as string | undefined) ?? "";
+// Module-level cache so synchronous `clientRoleGuard` calls used in TanStack
+// `beforeLoad` can read the latest known auth state without awaiting. The
+// authoritative source remains supabase.auth.getUser() + a server-side
+// SELECT against public.user_roles (RLS-protected). The cache is written
+// only after both succeed.
+// `undefined` = unresolved (e.g. first paint after hard refresh).
+// `null`      = resolved, no authenticated user / no recognized role.
+let cachedUser: LocalUser | null | undefined = undefined;
 
-const ACCOUNTS: Account[] = [
-  {
-    id: "anzrbo-admin", identifier: "0759566087", passwordHash: DEMO_PWD_HASH,
-    nom: "ADMIN", prenoms: "ANZRBO", role: "admin_anzrbo", home: "/admin",
-  },
-  {
-    id: "digitorg-admin", identifier: "admin", passwordHash: DEMO_PWD_HASH,
-    nom: "DIGITORG", prenoms: "Maître d'œuvre", role: "digitorg", home: "/digitorg",
-  },
-  {
-    id: "nsia-partner", identifier: "nsia", passwordHash: DEMO_PWD_HASH,
-    nom: "NSIA", prenoms: "Partenaire Assurance", role: "nsia", home: "/nsia",
-  },
-];
-
-function norm(v: string) {
-  return v.trim().toLowerCase();
-}
-
-async function sha256Hex(v: string): Promise<string> {
-  if (typeof crypto === "undefined" || !crypto.subtle) return "";
-  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(v));
-  return Array.from(new Uint8Array(buf))
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
-}
-
-export async function tryLogin(identifier: string, password: string): Promise<LocalUser | null> {
-  const id = norm(identifier).replace(/\s+/g, "");
-  const hash = await sha256Hex(password);
-  for (const a of ACCOUNTS) {
-    const candidate = norm(a.identifier);
-    const phoneEq = /^\d+$/.test(candidate) && id.replace(/\D/g, "") === candidate;
-    if ((id === candidate || phoneEq) && hash && hash === a.passwordHash) {
-      const { passwordHash: _p, ...user } = a;
-      if (typeof window !== "undefined") {
-        window.localStorage.setItem(STORAGE_KEY, JSON.stringify(user));
-      }
-      return user;
-    }
+function deriveAppRoles(dbRoles: DbRole[]): Role[] {
+  const set = new Set<Role>();
+  for (const r of dbRoles) {
+    const mapped = DB_ROLE_TO_APP[r];
+    if (mapped) mapped.forEach((m) => set.add(m));
   }
+  return Array.from(set);
+}
+
+function pickPrimary(roles: Role[]): Role | null {
+  if (roles.includes("admin_anzrbo")) return "admin_anzrbo";
+  if (roles.includes("digitorg")) return "digitorg";
+  if (roles.includes("nsia")) return "nsia";
   return null;
 }
 
-function readStoredUser(): LocalUser | null {
-  if (typeof window === "undefined") return null;
-  try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    return raw ? (JSON.parse(raw) as LocalUser) : null;
-  } catch { return null; }
+function displayNames(email: string, meta: Record<string, unknown> | null | undefined): { nom: string; prenoms: string } {
+  const fromMeta = (k: string) => (meta && typeof meta[k] === "string" ? (meta[k] as string) : "");
+  const nom = fromMeta("nom") || fromMeta("last_name");
+  const prenoms = fromMeta("prenoms") || fromMeta("first_name") || fromMeta("full_name");
+  if (nom || prenoms) return { nom: nom || "", prenoms: prenoms || "" };
+  const local = email.split("@")[0] || "Admin";
+  return { nom: local.toUpperCase(), prenoms: "" };
 }
 
-// Helper pour les `beforeLoad` de routes protégées (TanStack Router).
-// Renvoie un objet redirect quand l'utilisateur n'a pas le rôle requis.
-// NOTE: l'évaluation reste côté client — la vraie protection doit venir
-// d'une authentification serveur (Supabase Auth, etc.).
+async function loadCurrentUser(): Promise<LocalUser | null> {
+  // getUser() round-trips to Supabase Auth and validates the token server-side
+  // (unlike getSession which only reads the local store).
+  const { data: userData, error: userErr } = await supabase.auth.getUser();
+  if (userErr || !userData.user) return null;
+
+  const authUser = userData.user;
+  const email = authUser.email ?? "";
+
+  // public.user_roles is RLS-protected: `auth.uid() = user_id` for SELECT.
+  // The query therefore returns only this user's roles, even if the table
+  // were exposed by mistake — no enumeration risk.
+  const { data: roleRows, error: roleErr } = await supabase
+    .from("user_roles")
+    .select("role")
+    .eq("user_id", authUser.id);
+
+  if (roleErr) {
+    console.error("user_roles fetch failed", roleErr);
+    return null;
+  }
+
+  const dbRoles = (roleRows ?? []).map((r) => r.role as DbRole);
+  const appRoles = deriveAppRoles(dbRoles);
+  const primary = pickPrimary(appRoles);
+  if (!primary) return null;
+
+  const { nom, prenoms } = displayNames(email, authUser.user_metadata as Record<string, unknown> | null);
+  return {
+    id: authUser.id,
+    identifier: email,
+    nom,
+    prenoms,
+    role: primary,
+    roles: appRoles,
+    home: ROLE_HOME[primary],
+  };
+}
+
+// Sync guard usable from TanStack `beforeLoad`. Returns a redirect target
+// when we KNOW the user does not have access; returns undefined while the
+// session is still resolving so the route can mount and the component-level
+// effect can render a loading state / redirect once `loading` flips false.
 export function clientRoleGuard(allowed: Role[]): { to: "/login" } | undefined {
-  if (typeof window === "undefined") return undefined;
-  const u = readStoredUser();
-  if (!u || !allowed.includes(u.role)) return { to: "/login" };
-  return undefined;
+  if (cachedUser === undefined) return undefined; // unknown → let the route load
+  if (!cachedUser) return { to: "/login" };
+  const ok = cachedUser.roles.some((r) => allowed.includes(r));
+  return ok ? undefined : { to: "/login" };
 }
 
 type Ctx = {
@@ -99,22 +128,77 @@ type Ctx = {
 };
 
 const AuthCtx = createContext<Ctx>({
-  user: null, loading: false, signIn: async () => null, signOut: async () => {},
+  user: null,
+  loading: false,
+  signIn: async () => null,
+  signOut: async () => {},
 });
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<LocalUser | null>(null);
   const [loading, setLoading] = useState(true);
-  useEffect(() => { setUser(readStoredUser()); setLoading(false); }, []);
+  const mountedRef = useRef(true);
+
+  useEffect(() => {
+    mountedRef.current = true;
+
+    // Subscribe FIRST so we never miss an event fired between the initial
+    // load and the subscription being attached.
+    const { data: sub } = supabase.auth.onAuthStateChange((event) => {
+      if (event !== "SIGNED_IN" && event !== "SIGNED_OUT" && event !== "USER_UPDATED" && event !== "TOKEN_REFRESHED") return;
+      // Defer the work so we don't call into supabase from inside the listener.
+      setTimeout(() => {
+        void loadCurrentUser().then((u) => {
+          cachedUser = u;
+          if (mountedRef.current) setUser(u);
+        });
+      }, 0);
+    });
+
+    void loadCurrentUser().then((u) => {
+      cachedUser = u;
+      if (mountedRef.current) {
+        setUser(u);
+        setLoading(false);
+      }
+    });
+
+    return () => {
+      mountedRef.current = false;
+      sub.subscription.unsubscribe();
+    };
+  }, []);
+
   return (
     <AuthCtx.Provider
       value={{
-        user, loading,
-        signIn: async (id, pwd) => { const u = await tryLogin(id, pwd); if (u) setUser(u); return u; },
+        user,
+        loading,
+        signIn: async (identifier, password) => {
+          // The identifier MUST be an e-mail. We no longer resolve phone
+          // numbers to e-mails server-side (that RPC was removed because
+          // it enabled unauthenticated account enumeration).
+          const email = identifier.trim();
+          const { error } = await supabase.auth.signInWithPassword({ email, password });
+          if (error) return null;
+          const u = await loadCurrentUser();
+          cachedUser = u;
+          setUser(u);
+          if (!u) {
+            // Signed in but no recognized admin role → terminate session.
+            await supabase.auth.signOut();
+            return null;
+          }
+          return u;
+        },
         signOut: async () => {
-          try { if (typeof window !== "undefined") window.localStorage.removeItem(STORAGE_KEY); } catch {}
-          setUser(null);
-          if (typeof window !== "undefined") window.location.assign("/login");
+          try {
+            await supabase.auth.signOut();
+          } finally {
+            cachedUser = null;
+            setUser(null);
+            if (typeof window !== "undefined") window.location.assign("/login");
+          }
         },
       }}
     >
