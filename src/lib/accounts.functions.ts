@@ -5,14 +5,14 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 // Mappés à des valeurs de l'enum public.app_role.
 export type AccountRole =
   | "super_admin"
-  | "admin_national"
-  | "delegue_section"
+  | "admin_anzrbo"
+  | "agent_saisie"
   | "nsia";
 
 const ALLOWED_ROLES: AccountRole[] = [
   "super_admin",
-  "admin_national",
-  "delegue_section",
+  "admin_anzrbo",
+  "agent_saisie",
   "nsia",
 ];
 
@@ -53,7 +53,7 @@ export const seedInitialAccounts = createServerFn({ method: "POST" }).handler(
 
     const seeds: Array<{ identifiant: string; password: string; role: AccountRole; display: string }> = [
       { identifiant: "admin",       password: "@DigitOrg",     role: "super_admin",    display: "DigitOrg" },
-      { identifiant: "0759566087",  password: "@Anzrabo2026",  role: "admin_national", display: "Admin ANZRBO" },
+      { identifiant: "0759566087",  password: "@Anzrabo2026",  role: "admin_anzrbo",   display: "Admin ANZRBO" },
       { identifiant: "nsia",        password: "@Nsia123",      role: "nsia",           display: "NSIA" },
     ];
 

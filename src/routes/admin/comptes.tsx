@@ -31,8 +31,8 @@ type AccountRow = Awaited<ReturnType<typeof listAccounts>>[number];
 
 const ROLE_LABELS: Record<AccountRole, string> = {
   super_admin: "Super admin (DigitOrg)",
-  admin_national: "Admin ANZRBO",
-  delegue_section: "Délégué ANZRBO",
+  admin_anzrbo: "Admin ANZRBO",
+  agent_saisie: "Délégué ANZRBO",
   nsia: "NSIA",
 };
 
@@ -61,7 +61,7 @@ function Page() {
   const [open, setOpen] = useState(false);
   const [fIdent, setFIdent] = useState("");
   const [fPwd, setFPwd] = useState("");
-  const [fRole, setFRole] = useState<AccountRole>("delegue_section");
+  const [fRole, setFRole] = useState<AccountRole>("agent_saisie");
   const [fName, setFName] = useState("");
 
   async function onCreate(e: React.FormEvent) {
@@ -69,7 +69,7 @@ function Page() {
     try {
       await fnCreate({ data: { identifiant: fIdent, password: fPwd, role: fRole, display_name: fName } });
       toast.success("Compte créé");
-      setOpen(false); setFIdent(""); setFPwd(""); setFName(""); setFRole("delegue_section");
+      setOpen(false); setFIdent(""); setFPwd(""); setFName(""); setFRole("agent_saisie");
       await refresh();
     } catch (e: any) { toast.error(e?.message ?? "Erreur"); }
   }
@@ -123,8 +123,8 @@ function Page() {
                     <Select value={fRole} onValueChange={(v) => setFRole(v as AccountRole)}>
                       <SelectTrigger><SelectValue /></SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="admin_national">Admin ANZRBO</SelectItem>
-                        <SelectItem value="delegue_section">Délégué ANZRBO</SelectItem>
+                        <SelectItem value="admin_anzrbo">Admin ANZRBO</SelectItem>
+                        <SelectItem value="agent_saisie">Délégué ANZRBO</SelectItem>
                         <SelectItem value="nsia">NSIA</SelectItem>
                         <SelectItem value="super_admin">Super admin (DigitOrg)</SelectItem>
                       </SelectContent>
