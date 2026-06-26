@@ -91,8 +91,8 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { name: "twitter:title", content: "ANZRBO — Entraide et solidarité N'Zipris à Bonon" },
       { property: "og:description", content: "Plateforme officielle ANZRBO : entraide, assistance au décès et solidarité — sous-préfecture de Bonon, Côte d'Ivoire." },
       { name: "twitter:description", content: "Plateforme officielle ANZRBO : entraide, assistance au décès et solidarité — sous-préfecture de Bonon, Côte d'Ivoire." },
-      { property: "og:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/attachments/og-images/c78cfc05-3776-49ce-b5a7-4f36fd177cfb" },
-      { name: "twitter:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/attachments/og-images/c78cfc05-3776-49ce-b5a7-4f36fd177cfb" },
+      { property: "og:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/eDVA4jif9zfki6szlpldqUQwll22/social-images/social-1782462090359-LOGO_ANZRBO.webp" },
+      { name: "twitter:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/eDVA4jif9zfki6szlpldqUQwll22/social-images/social-1782462090359-LOGO_ANZRBO.webp" },
     ],
     links: [
       {
