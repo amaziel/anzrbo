@@ -1,19 +1,18 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
+import { useServerFn } from "@tanstack/react-start";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { DashboardHeader, ADMIN_NAV } from "@/components/DashboardHeader";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { useAuth, clientRoleGuard } from "@/lib/auth";
-import {
-  MEMBRES, ayantsDroitDe, cotisationsDuMembre, souscriptionDe,
-  declarationsDuMembre, aJour, Membre,
-} from "@/lib/data";
-import { Search, Users, Eye, IdCard, ExternalLink } from "lucide-react";
-import { MemberCardRecto, MemberCardVerso } from "@/components/MemberCard";
+import { listMembers, getMember, deleteMember, addPaiement, uploadFile, type MemberRow } from "@/lib/members.functions";
+import { Search, Users, Eye, Trash2, Receipt, ChevronLeft, ChevronRight } from "lucide-react";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/admin/membres/")({
   beforeLoad: () => { const r = clientRoleGuard(["admin_anzrbo"]); if (r) throw r; },
@@ -34,20 +33,33 @@ function ListeMembres() {
   const { user, loading } = useAuth();
   const nav = useNavigate();
   useEffect(() => { if (!loading && (!user || user.role !== "admin_anzrbo")) nav({ to: "/login" }); }, [user, loading, nav]);
-  const [q, setQ] = useState("");
-  const [selected, setSelected] = useState<Membre | null>(null);
 
-  const filtered = useMemo(() => {
-    const s = q.trim().toLowerCase();
-    if (!s) return MEMBRES;
-    return MEMBRES.filter((m) =>
-      m.nom.toLowerCase().includes(s) || m.prenoms.toLowerCase().includes(s)
-      || m.telephone.includes(s) || m.numeroMembre.toLowerCase().includes(s)
-      || m.village.toLowerCase().includes(s)
-    );
-  }, [q]);
+  const listFn = useServerFn(listMembers);
+  const delFn = useServerFn(deleteMember);
+  const qc = useQueryClient();
+
+  const [q, setQ] = useState("");
+  const [page, setPage] = useState(1);
+  const pageSize = 20;
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+
+  const { data, isLoading } = useQuery({
+    queryKey: ["members", q, page],
+    queryFn: () => listFn({ data: { q, page, pageSize } }),
+    enabled: !!user,
+  });
+
+  const delMut = useMutation({
+    mutationFn: (id: string) => delFn({ data: { id } }),
+    onSuccess: () => { toast.success("Membre supprimé"); qc.invalidateQueries({ queryKey: ["members"] }); },
+    onError: (e: any) => toast.error(e?.message ?? "Erreur"),
+  });
 
   if (loading || !user) return <div className="flex min-h-screen items-center justify-center">Chargement…</div>;
+
+  const rows = data?.rows ?? [];
+  const total = data?.total ?? 0;
+  const lastPage = Math.max(1, Math.ceil(total / pageSize));
 
   return (
     <div className="min-h-screen bg-muted/30">
@@ -57,12 +69,13 @@ function ListeMembres() {
           <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <CardTitle className="flex items-center gap-2"><Users className="h-5 w-5 text-primary" /> Liste des membres</CardTitle>
-              <CardDescription>{MEMBRES.length} membres enregistrés par l'administration ANZRBO.</CardDescription>
+              <CardDescription>{total} membre(s) enregistré(s).</CardDescription>
             </div>
             <div className="flex gap-2">
               <div className="relative">
                 <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <Input className="w-full pl-9 sm:w-80" placeholder="Nom, téléphone, n° membre…" value={q} onChange={(e) => setQ(e.target.value)} />
+                <Input className="w-full pl-9 sm:w-80" placeholder="Nom, téléphone, n° membre…"
+                  value={q} onChange={(e) => { setQ(e.target.value); setPage(1); }} />
               </div>
               <Button asChild><Link to="/admin/membres/nouveau">+ Nouveau membre</Link></Button>
             </div>
@@ -71,138 +84,167 @@ function ListeMembres() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>N° Membre</TableHead><TableHead>Nom complet</TableHead>
+                  <TableHead>Photo</TableHead><TableHead>N° Membre</TableHead><TableHead>Nom complet</TableHead>
                   <TableHead>Téléphone</TableHead><TableHead>Village</TableHead>
-                  <TableHead>Statut</TableHead><TableHead>Ayants droit</TableHead>
-                  <TableHead>NSIA</TableHead><TableHead>À jour</TableHead>
-                  <TableHead className="text-right">Action</TableHead>
+                  <TableHead>Statut</TableHead><TableHead>Inscrit</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filtered.map((m) => {
-                  const ns = souscriptionDe(m.id);
-                  return (
-                    <TableRow key={m.id}>
-                      <TableCell className="font-mono text-xs">{m.numeroMembre}</TableCell>
-                      <TableCell>{m.prenoms} {m.nom}</TableCell>
-                      <TableCell className="text-muted-foreground">{m.telephone}</TableCell>
-                      <TableCell>{m.village}</TableCell>
-                      <TableCell><StatutBadge s={m.statut} /></TableCell>
-                      <TableCell>{ayantsDroitDe(m.id).length}</TableCell>
-                      <TableCell>{ns ? `Formule ${ns.formule}` : "—"}</TableCell>
-                      <TableCell>{m.statut === "actif" ? (aJour(m.id) ? "✅" : "⚠️") : "—"}</TableCell>
-                      <TableCell className="text-right">
-                        <Button size="sm" variant="ghost" onClick={() => setSelected(m)}><Eye className="h-4 w-4" /></Button>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
+                {isLoading && (
+                  <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground">Chargement…</TableCell></TableRow>
+                )}
+                {!isLoading && rows.length === 0 && (
+                  <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground">Aucun membre trouvé.</TableCell></TableRow>
+                )}
+                {rows.map((m: MemberRow) => (
+                  <TableRow key={m.id}>
+                    <TableCell>
+                      {m.photo_url ? (
+                        <img src={m.photo_url} alt="" className="h-9 w-9 rounded-full object-cover" />
+                      ) : <div className="h-9 w-9 rounded-full bg-muted" />}
+                    </TableCell>
+                    <TableCell className="font-mono text-xs">{m.numero_membre}</TableCell>
+                    <TableCell>{m.prenoms} {m.nom}</TableCell>
+                    <TableCell className="text-muted-foreground">{m.telephone}</TableCell>
+                    <TableCell>{m.quartier ?? m.ville ?? "—"}</TableCell>
+                    <TableCell><StatutBadge s={m.statut} /></TableCell>
+                    <TableCell className="text-xs text-muted-foreground">{m.date_inscription ?? "—"}</TableCell>
+                    <TableCell className="text-right">
+                      <Button size="sm" variant="ghost" onClick={() => setSelectedId(m.id)}><Eye className="h-4 w-4" /></Button>
+                      <Button size="sm" variant="ghost" onClick={() => {
+                        if (confirm(`Supprimer ${m.prenoms} ${m.nom} ?`)) delMut.mutate(m.id);
+                      }}><Trash2 className="h-4 w-4 text-rose-600" /></Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
               </TableBody>
             </Table>
+
+            <div className="mt-4 flex items-center justify-between text-sm">
+              <div className="text-muted-foreground">Page {page} / {lastPage}</div>
+              <div className="flex gap-2">
+                <Button size="sm" variant="outline" disabled={page <= 1} onClick={() => setPage(p => Math.max(1, p - 1))}>
+                  <ChevronLeft className="h-4 w-4" /> Précédent
+                </Button>
+                <Button size="sm" variant="outline" disabled={page >= lastPage} onClick={() => setPage(p => Math.min(lastPage, p + 1))}>
+                  Suivant <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
           </CardContent>
         </Card>
       </main>
 
-      <Dialog open={!!selected} onOpenChange={(o) => !o && setSelected(null)}>
-        <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
-          <DialogHeader><DialogTitle>Fiche membre — {selected?.numeroMembre}</DialogTitle></DialogHeader>
-          {selected && <FicheMembre m={selected} />}
-        </DialogContent>
-      </Dialog>
+      <FicheDialog id={selectedId} onClose={() => setSelectedId(null)} />
     </div>
   );
 }
 
-function FicheMembre({ m }: { m: Membre }) {
-  const ad = ayantsDroitDe(m.id);
-  const cot = cotisationsDuMembre(m.id);
-  const ns = souscriptionDe(m.id);
-  const decl = declarationsDuMembre(m.id);
+function FicheDialog({ id, onClose }: { id: string | null; onClose: () => void }) {
+  const getFn = useServerFn(getMember);
+  const addPayFn = useServerFn(addPaiement);
+  const uploadFn = useServerFn(uploadFile);
+  const qc = useQueryClient();
+
+  const { data, isLoading } = useQuery({
+    queryKey: ["member", id],
+    queryFn: () => getFn({ data: { id: id! } }),
+    enabled: !!id,
+  });
+
+  const [montant, setMontant] = useState(1000);
+  const [periode, setPeriode] = useState("");
+  const [type, setType] = useState("cotisation");
+  const [justif, setJustif] = useState<File | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  async function ajouterPaiement() {
+    if (!id) return;
+    setBusy(true);
+    try {
+      let url: string | null = null;
+      if (justif) {
+        const buf = await justif.arrayBuffer();
+        const b64 = btoa(String.fromCharCode(...new Uint8Array(buf)));
+        const r = await uploadFn({ data: {
+          bucket: "payment-proofs",
+          path: `${id}-${Date.now()}-${justif.name}`,
+          base64: b64,
+          contentType: justif.type || "application/octet-stream",
+        }});
+        url = r.url;
+      }
+      await addPayFn({ data: { member_id: id, paiement: { type, montant, periode: periode || null, justificatif_url: url, methode: "especes" } } });
+      toast.success("Paiement enregistré");
+      setJustif(null); setPeriode("");
+      qc.invalidateQueries({ queryKey: ["member", id] });
+    } catch (e: any) { toast.error(e?.message ?? "Erreur"); }
+    finally { setBusy(false); }
+  }
+
   return (
-    <div className="space-y-4 text-sm">
-      <section className="grid grid-cols-2 gap-3 rounded-md bg-muted/40 p-4">
-        <Info l="Nom et prénoms" v={`${m.prenoms} ${m.nom}`} />
-        <Info l="Téléphone" v={m.telephone + (m.contact2 ? ` / ${m.contact2}` : "")} />
-        <Info l="Sous-préfecture / Village" v={`${m.sousPrefecture} / ${m.village}`} />
-        <Info l="Quartier / Campement" v={m.quartier || "—"} />
-        <Info l="Date / Lieu de naissance" v={`${new Date(m.dateNaissance).toLocaleDateString("fr-FR")} à ${m.lieuNaissance}`} />
-        <Info l="Date d'adhésion" v={new Date(m.dateInscription).toLocaleDateString("fr-FR")} />
-        <Info l="Statut" v={<StatutBadge s={m.statut} />} />
-        <Info l="Cotisations à jour" v={aJour(m.id) ? "Oui" : "Non"} />
-      </section>
+    <Dialog open={!!id} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
+        <DialogHeader><DialogTitle>Fiche membre {data?.member?.numero_membre ?? ""}</DialogTitle></DialogHeader>
+        {isLoading || !data ? <p className="text-muted-foreground">Chargement…</p> : (
+          <div className="space-y-4 text-sm">
+            <div className="flex gap-4">
+              {data.member.photo_url && <img src={data.member.photo_url} alt="" className="h-24 w-24 rounded-md object-cover" />}
+              <div className="grid grid-cols-2 gap-2">
+                <Info l="Nom" v={`${data.member.prenoms} ${data.member.nom}`} />
+                <Info l="Téléphone" v={data.member.telephone} />
+                <Info l="Village" v={data.member.quartier ?? data.member.ville ?? "—"} />
+                <Info l="Naissance" v={`${data.member.date_naissance ?? "—"} — ${data.member.lieu_naissance ?? ""}`} />
+                <Info l="Inscrit le" v={data.member.date_inscription ?? "—"} />
+                <Info l="Statut" v={<StatutBadge s={data.member.statut} />} />
+              </div>
+            </div>
 
-      <section>
-        <h3 className="font-semibold">Personne d'urgence</h3>
-        <p className="text-muted-foreground">{m.urgence.nom} — {m.urgence.contact1}{m.urgence.contact2 ? ` / ${m.urgence.contact2}` : ""} — {m.urgence.adresse}</p>
-      </section>
+            <section>
+              <h3 className="font-semibold">Ayants droit ({data.ayants.length})</h3>
+              <ul className="mt-1 space-y-1 text-muted-foreground">
+                {data.ayants.map((a: any) => (
+                  <li key={a.id}>• {a.relation} — {a.nom} {a.date_naissance ? `(né(e) le ${a.date_naissance})` : ""}</li>
+                ))}
+                {data.ayants.length === 0 && <li>Aucun.</li>}
+              </ul>
+            </section>
 
-      <section>
-        <h3 className="font-semibold">Ayants droit ({ad.length})</h3>
-        <ul className="mt-1 space-y-1 text-muted-foreground">
-          {ad.map((a) => (
-            <li key={a.id}>• {a.lien} — {a.nom} (né(e) le {new Date(a.dateNaissance).toLocaleDateString("fr-FR")} à {a.lieuNaissance})</li>
-          ))}
-        </ul>
-      </section>
+            <section>
+              <h3 className="font-semibold">Paiements ({data.paiements.length})</h3>
+              <ul className="mt-1 space-y-1 text-muted-foreground">
+                {data.paiements.map((p: any) => (
+                  <li key={p.id} className="flex items-center justify-between">
+                    <span>• {p.type} — {p.montant?.toLocaleString("fr-FR")} F {p.periode ? `(${p.periode})` : ""} — {new Date(p.paye_le ?? p.created_at).toLocaleDateString("fr-FR")}</span>
+                    {p.justificatif_url && <a href={p.justificatif_url} target="_blank" rel="noreferrer" className="text-primary underline">justif.</a>}
+                  </li>
+                ))}
+                {data.paiements.length === 0 && <li>Aucun paiement.</li>}
+              </ul>
 
-      <section>
-        <h3 className="font-semibold">Souscription NSIA</h3>
-        {ns ? (
-          <p className="text-muted-foreground">
-            Formule {ns.formule} — bénéfice {ns.benefice.toLocaleString("fr-FR")} F/personne, {ns.nbPersonnes} personnes,
-            cotisation annuelle {ns.cotisationAnnuelle.toLocaleString("fr-FR")} F (depuis {new Date(ns.dateSouscription).toLocaleDateString("fr-FR")}).
-          </p>
-        ) : <p className="text-muted-foreground">Aucune souscription NSIA.</p>}
-      </section>
-
-      <section>
-        <h3 className="font-semibold">Cotisations ({cot.length})</h3>
-        <p className="text-xs text-muted-foreground">
-          Payées : {cot.filter((c) => c.statut === "payee").length} — En retard : {cot.filter((c) => c.statut === "en_retard").length}
-        </p>
-      </section>
-
-      <section>
-        <h3 className="font-semibold">Déclarations de décès liées ({decl.length})</h3>
-        <ul className="mt-1 space-y-1 text-muted-foreground">
-          {decl.map((d) => <li key={d.id}>• {d.defuntType === "principal" ? "Décès du membre" : "Décès ayant droit"} : {d.nomDefunt} le {new Date(d.dateDeces).toLocaleDateString("fr-FR")}</li>)}
-          {decl.length === 0 && <li>Aucune.</li>}
-        </ul>
-      </section>
-
-      <section>
-        <h3 className="font-semibold">Preuve d'inscription</h3>
-        <p className="text-muted-foreground">
-          {m.paiementInscription.mode === "especes" ? "Espèces" : "Mobile Money"} —
-          {m.paiementInscription.typePreuve === "id_transaction" ? ` ID transaction : ${m.paiementInscription.idTransaction}` : " Justificatif (photo/document)"} —
-          {" "}{m.paiementInscription.montant.toLocaleString("fr-FR")} F le {new Date(m.paiementInscription.date).toLocaleDateString("fr-FR")}
-        </p>
-      </section>
-
-      <section className="rounded-md border border-[#0c5b2e]/15 bg-[#f7f3e9]/40 p-4">
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-          <h3 className="flex items-center gap-2 font-semibold text-[#0c5b2e]">
-            <IdCard className="h-4 w-4" /> Carte officielle de membre
-          </h3>
-          <div className="flex gap-2">
-            <Button asChild size="sm" variant="outline">
-              <a href={`/verifier/${encodeURIComponent(m.numeroMembre)}`} target="_blank" rel="noreferrer">
-                Fiche publique <ExternalLink className="ml-1 h-3 w-3" />
-              </a>
-            </Button>
-            <Button asChild size="sm" className="bg-[#0c5b2e] hover:bg-[#0a4a26]">
-              <a href={`/carte?q=${encodeURIComponent(m.telephone)}`} target="_blank" rel="noreferrer">
-                Portail imprimeur
-              </a>
-            </Button>
+              <div className="mt-3 grid grid-cols-2 gap-2 rounded-md border p-3 md:grid-cols-5">
+                <select className="rounded border px-2 py-1" value={type} onChange={(e) => setType(e.target.value)}>
+                  <option value="cotisation">Cotisation</option>
+                  <option value="nsia">NSIA</option>
+                  <option value="autre">Autre</option>
+                </select>
+                <Input type="number" value={montant} onChange={(e) => setMontant(+e.target.value)} placeholder="Montant" />
+                <Input value={periode} onChange={(e) => setPeriode(e.target.value)} placeholder="Période (2026-01)" />
+                <Input type="file" accept="image/*,application/pdf" capture="environment"
+                  onChange={(e) => setJustif(e.target.files?.[0] ?? null)} />
+                <Button onClick={ajouterPaiement} disabled={busy}>
+                  <Receipt className="mr-1 h-4 w-4" /> {busy ? "…" : "Ajouter"}
+                </Button>
+              </div>
+            </section>
           </div>
-        </div>
-        <div className="flex flex-col items-center gap-4">
-          <MemberCardRecto m={m} />
-          <MemberCardVerso m={m} />
-        </div>
-      </section>
-    </div>
+        )}
+        <DialogFooter>
+          <Button variant="ghost" onClick={onClose}>Fermer</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
