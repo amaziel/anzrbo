@@ -1,15 +1,17 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
+import { useServerFn } from "@tanstack/react-start";
 import { DashboardHeader, ADMIN_NAV } from "@/components/DashboardHeader";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
-import { Plus, Trash2, Save } from "lucide-react";
+import { Save } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth, clientRoleGuard } from "@/lib/auth";
+import { AyantsDroitFields, EMPTY_AYANT, relationToEnum, type AyantDroit } from "@/components/AyantsDroitFields";
+import { createMember, uploadFile } from "@/lib/members.functions";
 
 export const Route = createFileRoute("/admin/membres/nouveau")({
   beforeLoad: () => { const r = clientRoleGuard(["admin_anzrbo"]); if (r) throw r; },
@@ -17,49 +19,115 @@ export const Route = createFileRoute("/admin/membres/nouveau")({
   head: () => ({ meta: [{ title: "Nouvelle inscription — Admin ANZRBO" }] }),
 });
 
-type Ayant = { lien: string; nom: string; dateNaissance: string; lieuNaissance: string };
+async function fileToBase64(file: File): Promise<string> {
+  const buf = await file.arrayBuffer();
+  let bin = "";
+  const bytes = new Uint8Array(buf);
+  const chunk = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunk) {
+    bin += String.fromCharCode.apply(null, Array.from(bytes.subarray(i, i + chunk)));
+  }
+  return btoa(bin);
+}
+
+async function compressImage(file: File, maxDim = 1280, quality = 0.82): Promise<Blob> {
+  if (!file.type.startsWith("image/")) return file;
+  const bmp = await createImageBitmap(file).catch(() => null);
+  if (!bmp) return file;
+  const ratio = Math.min(1, maxDim / Math.max(bmp.width, bmp.height));
+  const w = Math.round(bmp.width * ratio), h = Math.round(bmp.height * ratio);
+  const canvas = document.createElement("canvas");
+  canvas.width = w; canvas.height = h;
+  const ctx = canvas.getContext("2d")!;
+  ctx.drawImage(bmp, 0, 0, w, h);
+  return await new Promise((res) => canvas.toBlob((b) => res(b ?? file), "image/jpeg", quality));
+}
 
 function NouveauMembre() {
   const { user, loading } = useAuth();
   const nav = useNavigate();
+  const createMemberFn = useServerFn(createMember);
+  const uploadFileFn = useServerFn(uploadFile);
   useEffect(() => { if (!loading && (!user || user.role !== "admin_anzrbo")) nav({ to: "/login" }); }, [user, loading, nav]);
 
   const [form, setForm] = useState({
     nom: "", prenoms: "", telephone: "", contact2: "",
+    sexe: "" as "" | "M" | "F",
     sousPrefecture: "Bonon", village: "", quartier: "",
     dateNaissance: "", lieuNaissance: "",
-    urgenceNom: "", urgenceC1: "", urgenceC2: "", urgenceAdresse: "",
     mode: "especes" as "especes" | "mobile_money",
     typePreuve: "id_transaction" as "id_transaction" | "photo_document",
     idTransaction: "",
+    notes: "",
   });
   const [photo, setPhoto] = useState<File | null>(null);
   const [preuve, setPreuve] = useState<File | null>(null);
-  const [ayants, setAyants] = useState<Ayant[]>([{ lien: "", nom: "", dateNaissance: "", lieuNaissance: "" }]);
+  const [ayants, setAyants] = useState<AyantDroit[]>([{ ...EMPTY_AYANT }]);
+  const [busy, setBusy] = useState(false);
 
   function set<K extends keyof typeof form>(k: K, v: any) { setForm((f) => ({ ...f, [k]: v })); }
 
-  function addAyant() {
-    if (ayants.length >= 5) return;
-    setAyants((a) => [...a, { lien: "", nom: "", dateNaissance: "", lieuNaissance: "" }]);
-  }
-  function rmAyant(i: number) { setAyants((a) => a.filter((_, k) => k !== i)); }
-  function updAyant(i: number, p: Partial<Ayant>) { setAyants((a) => a.map((x, k) => k === i ? { ...x, ...p } : x)); }
-
-  function submit(e: React.FormEvent) {
+  async function submit(e: React.FormEvent) {
     e.preventDefault();
     if (!photo) return toast.error("Photo du membre obligatoire.");
     if (!form.nom || !form.prenoms || !form.telephone || !form.village || !form.dateNaissance || !form.lieuNaissance) {
       return toast.error("Champs obligatoires manquants.");
     }
-    if (!form.urgenceNom || !form.urgenceC1 || !form.urgenceAdresse) return toast.error("Personne d'urgence incomplète.");
     if (form.typePreuve === "id_transaction" && !form.idTransaction) return toast.error("ID de transaction obligatoire.");
     if (form.typePreuve === "photo_document" && !preuve) return toast.error("Justificatif (photo/document) obligatoire.");
-    const valides = ayants.filter((a) => a.lien && a.nom && a.dateNaissance && a.lieuNaissance);
-    if (valides.length < 1) return toast.error("Au moins 1 ayant droit complet est requis.");
 
-    toast.success(`Membre ${form.prenoms} ${form.nom} enregistré (mode local). Numéro généré : ANZRBO-2026-XXXXX.`);
-    setTimeout(() => nav({ to: "/admin/membres" }), 800);
+    setBusy(true);
+    try {
+      // 1) Upload photo (compressée)
+      const blob = await compressImage(photo, 1024, 0.8);
+      const f = new File([blob], `photo-${Date.now()}.jpg`, { type: "image/jpeg" });
+      const b64 = await fileToBase64(f);
+      const path = `${Date.now()}-${form.telephone.replace(/\D/g, "")}.jpg`;
+      const photoRes = await uploadFileFn({ data: { bucket: "member-photos", path, base64: b64, contentType: "image/jpeg" } });
+
+      // 2) Upload justificatif si présent
+      let justificatifUrl: string | null = null;
+      if (form.typePreuve === "photo_document" && preuve) {
+        const pb = preuve.type.startsWith("image/") ? await compressImage(preuve, 1600, 0.85) : preuve;
+        const pf = new File([pb], preuve.name, { type: pb.type || preuve.type });
+        const pbb64 = await fileToBase64(pf);
+        const ppath = `inscription-${Date.now()}-${form.telephone.replace(/\D/g, "")}-${preuve.name}`;
+        const r = await uploadFileFn({ data: { bucket: "payment-proofs", path: ppath, base64: pbb64, contentType: pf.type } });
+        justificatifUrl = r.url;
+      }
+
+      // 3) Création membre + ayants droit + paiement inscription
+      const res = await createMemberFn({
+        data: {
+          nom: form.nom, prenoms: form.prenoms,
+          telephone: form.telephone, contact2: form.contact2 || null,
+          sexe: form.sexe || null,
+          date_naissance: form.dateNaissance, lieu_naissance: form.lieuNaissance,
+          ville: form.sousPrefecture, quartier: form.village, adresse: form.quartier || null,
+          photo_url: photoRes.url,
+          notes: form.notes || null,
+          ayants: ayants.filter(a => a.type && a.nom).map(a => ({
+            nom: a.nom,
+            relation: relationToEnum(a.type),
+            relation_label: a.type,
+            date_naissance: a.dateNaissance || null,
+          })),
+          paiement_inscription: {
+            type: "inscription",
+            montant: 1500,
+            methode: form.mode,
+            reference_externe: form.typePreuve === "id_transaction" ? form.idTransaction : null,
+            justificatif_url: justificatifUrl,
+          },
+        }
+      });
+      toast.success(`Membre enregistré : ${res.member.numero_membre}`);
+      setTimeout(() => nav({ to: "/admin/membres" }), 600);
+    } catch (err: any) {
+      toast.error(err?.message ?? "Erreur lors de l'enregistrement");
+    } finally {
+      setBusy(false);
+    }
   }
 
   if (loading || !user) return <div className="flex min-h-screen items-center justify-center">Chargement…</div>;
@@ -71,7 +139,7 @@ function NouveauMembre() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold">Nouveau membre</h1>
-            <p className="text-sm text-muted-foreground">Formulaire conforme au CDC ANZRBO — accès admin uniquement.</p>
+            <p className="text-sm text-muted-foreground">Formulaire conforme à la charte ANZRBO — accès admin uniquement.</p>
           </div>
           <Button asChild variant="ghost"><Link to="/admin/membres">← Annuler</Link></Button>
         </div>
@@ -82,12 +150,23 @@ function NouveauMembre() {
             <CardContent className="grid gap-4 md:grid-cols-2">
               <div className="md:col-span-2">
                 <Label>Photo du membre *</Label>
-                <Input type="file" accept="image/png,image/jpeg" onChange={(e) => setPhoto(e.target.files?.[0] ?? null)} />
+                <Input type="file" accept="image/png,image/jpeg,image/webp" capture="environment"
+                  onChange={(e) => setPhoto(e.target.files?.[0] ?? null)} />
+                <p className="mt-1 text-xs text-muted-foreground">Compression automatique avant envoi.</p>
               </div>
               <Field label="Nom *"><Input value={form.nom} onChange={(e) => set("nom", e.target.value)} required /></Field>
               <Field label="Prénoms *"><Input value={form.prenoms} onChange={(e) => set("prenoms", e.target.value)} required /></Field>
-              <Field label="Numéro de téléphone * (unique)"><Input type="tel" value={form.telephone} onChange={(e) => set("telephone", e.target.value)} required /></Field>
+              <Field label="Téléphone * (unique)"><Input type="tel" value={form.telephone} onChange={(e) => set("telephone", e.target.value)} required /></Field>
               <Field label="Second contact"><Input type="tel" value={form.contact2} onChange={(e) => set("contact2", e.target.value)} /></Field>
+              <Field label="Sexe">
+                <Select value={form.sexe} onValueChange={(v) => set("sexe", v)}>
+                  <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="M">Masculin</SelectItem>
+                    <SelectItem value="F">Féminin</SelectItem>
+                  </SelectContent>
+                </Select>
+              </Field>
               <Field label="Sous-préfecture *">
                 <Select value={form.sousPrefecture} onValueChange={(v) => set("sousPrefecture", v)}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
@@ -102,54 +181,21 @@ function NouveauMembre() {
           </Card>
 
           <Card>
-            <CardHeader><CardTitle>Section 2 — Personne d'urgence</CardTitle></CardHeader>
-            <CardContent className="grid gap-4 md:grid-cols-2">
-              <Field label="Nom et prénoms *"><Input value={form.urgenceNom} onChange={(e) => set("urgenceNom", e.target.value)} required /></Field>
-              <Field label="Contact 1 *"><Input type="tel" value={form.urgenceC1} onChange={(e) => set("urgenceC1", e.target.value)} required /></Field>
-              <Field label="Contact 2"><Input type="tel" value={form.urgenceC2} onChange={(e) => set("urgenceC2", e.target.value)} /></Field>
-              <Field label="Résidence / Adresse *"><Input value={form.urgenceAdresse} onChange={(e) => set("urgenceAdresse", e.target.value)} required /></Field>
-            </CardContent>
-          </Card>
-
-          <Card>
             <CardHeader>
-              <CardTitle className="flex items-center justify-between">
-                Section 3 — Ayants droit (1 à 5)
-                <Button type="button" size="sm" variant="outline" onClick={addAyant} disabled={ayants.length >= 5}>
-                  <Plus className="mr-1 h-3 w-3" /> Ajouter ({ayants.length}/5)
-                </Button>
-              </CardTitle>
-              <CardDescription>Père, mère, beau-père, belle-mère, conjoint(e) — max 1 par type.</CardDescription>
+              <CardTitle>Section 2 — Ayants droit</CardTitle>
+              <CardDescription>
+                Personnes de référence en cas d'absence du membre principal. Ils ne cotisent pas et ne donnent pas lieu à une déclaration de décès.
+              </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-3">
-              {ayants.map((a, i) => (
-                <div key={i} className="grid gap-3 rounded-md border p-3 md:grid-cols-[160px_1fr_160px_1fr_auto]">
-                  <div>
-                    <Label className="text-xs">Lien de parenté</Label>
-                    <Select value={a.lien} onValueChange={(v) => updAyant(i, { lien: v })}>
-                      <SelectTrigger><SelectValue placeholder="Choisir…" /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="pere">Père</SelectItem>
-                        <SelectItem value="mere">Mère</SelectItem>
-                        <SelectItem value="beau-pere">Beau-père</SelectItem>
-                        <SelectItem value="belle-mere">Belle-mère</SelectItem>
-                        <SelectItem value="conjoint">Conjoint(e)</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div><Label className="text-xs">Nom et prénoms</Label><Input value={a.nom} onChange={(e) => updAyant(i, { nom: e.target.value })} /></div>
-                  <div><Label className="text-xs">Date de naissance</Label><Input type="date" value={a.dateNaissance} onChange={(e) => updAyant(i, { dateNaissance: e.target.value })} /></div>
-                  <div><Label className="text-xs">Lieu de naissance</Label><Input value={a.lieuNaissance} onChange={(e) => updAyant(i, { lieuNaissance: e.target.value })} /></div>
-                  <div className="flex items-end"><Button type="button" size="icon" variant="ghost" onClick={() => rmAyant(i)}><Trash2 className="h-4 w-4" /></Button></div>
-                </div>
-              ))}
+            <CardContent>
+              <AyantsDroitFields value={ayants} onChange={setAyants} max={8} />
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader>
-              <CardTitle>Section 4 — Preuve de paiement des frais d'inscription (1 500 FCFA)</CardTitle>
-              <CardDescription>Frais perçus par DigitOrg pour la mise en service du compte membre.</CardDescription>
+              <CardTitle>Section 3 — Frais d'inscription (1 500 FCFA)</CardTitle>
+              <CardDescription>Perçus pour la mise en service du compte membre.</CardDescription>
             </CardHeader>
             <CardContent className="grid gap-4 md:grid-cols-2">
               <Field label="Mode de paiement">
@@ -166,21 +212,26 @@ function NouveauMembre() {
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="id_transaction">ID de transaction</SelectItem>
-                    <SelectItem value="photo_document">Photo-document</SelectItem>
+                    <SelectItem value="photo_document">Photo/document</SelectItem>
                   </SelectContent>
                 </Select>
               </Field>
               {form.typePreuve === "id_transaction" ? (
                 <Field label="ID de transaction *"><Input value={form.idTransaction} onChange={(e) => set("idTransaction", e.target.value)} /></Field>
               ) : (
-                <Field label="Fichier justificatif * (PDF/image)"><Input type="file" accept="image/*,application/pdf" onChange={(e) => setPreuve(e.target.files?.[0] ?? null)} /></Field>
+                <Field label="Justificatif * (PDF/image, caméra OK)">
+                  <Input type="file" accept="image/*,application/pdf" capture="environment"
+                    onChange={(e) => setPreuve(e.target.files?.[0] ?? null)} />
+                </Field>
               )}
             </CardContent>
           </Card>
 
           <div className="flex justify-end gap-2">
             <Button asChild variant="ghost"><Link to="/admin/membres">Annuler</Link></Button>
-            <Button type="submit"><Save className="mr-2 h-4 w-4" /> Enregistrer le membre</Button>
+            <Button type="submit" disabled={busy}>
+              <Save className="mr-2 h-4 w-4" /> {busy ? "Enregistrement…" : "Enregistrer le membre"}
+            </Button>
           </div>
         </form>
       </main>
