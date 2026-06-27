@@ -10,7 +10,7 @@ export const roleDiagnostics = createServerFn({ method: "POST" })
     const roleResults: Array<{ role: string; has: boolean; error?: string }> = [];
     for (const r of rolesToTest) {
       try {
-        const { data, error } = await supabase.rpc("has_role", { _user_id: userId, _role: r });
+        const { data, error } = await (supabase as any).rpc("has_role", { _user_id: userId, _role: r });
         roleResults.push({ role: r, has: !!data, error: error?.message });
       } catch (e: any) {
         roleResults.push({ role: r, has: false, error: e?.message ?? "rpc error" });
