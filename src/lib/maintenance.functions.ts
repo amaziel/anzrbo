@@ -50,7 +50,7 @@ export const roleDiagnostics = createServerFn({ method: "POST" })
 export const purgeDemoData = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    const { data: isSuper } = await context.supabase.rpc("has_role", { _user_id: context.userId, _role: "super_admin" });
+    const { data: isSuper } = await (context.supabase as any).rpc("has_role", { _user_id: context.userId, _role: "super_admin" });
     if (!isSuper) throw new Error("Forbidden — super_admin requis");
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
