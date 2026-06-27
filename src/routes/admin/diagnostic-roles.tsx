@@ -12,7 +12,7 @@ import { roleDiagnostics, purgeDemoData } from "@/lib/maintenance.functions";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/admin/diagnostic-roles")({
-  beforeLoad: () => { const r = clientRoleGuard(["admin_anzrbo", "super_admin"]); if (r) throw r; },
+  beforeLoad: () => { const r = clientRoleGuard(["admin_anzrbo", "digitorg"]); if (r) throw r; },
   component: DiagnosticRoles,
   head: () => ({ meta: [{ title: "Diagnostic rôles — Admin ANZRBO" }] }),
 });
