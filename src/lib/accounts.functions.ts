@@ -109,7 +109,7 @@ export const seedInitialAccounts = createServerFn({ method: "POST" }).handler(
       // 3) upsert user_roles
       const { error: e2 } = await (supabaseAdmin as any)
         .from("user_roles")
-        .upsert({ user_id: userId, role: s.role }, { onConflict: "user_id,role" });
+        .upsert({ user_id: userId, role: dbRoleFor(s.role) }, { onConflict: "user_id,role" });
       if (e2) { results.push({ identifiant: s.identifiant, ok: false, error: e2.message }); continue; }
 
       results.push({ identifiant: s.identifiant, ok: true });
