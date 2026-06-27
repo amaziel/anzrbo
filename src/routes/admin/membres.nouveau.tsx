@@ -245,11 +245,20 @@ function NouveauMembre() {
             </CardContent>
           </Card>
 
-          <div className="flex justify-end gap-2">
-            <Button asChild variant="ghost"><Link to="/admin/membres">Annuler</Link></Button>
-            <Button type="submit" disabled={busy}>
-              <Save className="mr-2 h-4 w-4" /> {busy ? "Enregistrement…" : "Enregistrer le membre"}
-            </Button>
+          <div className="flex flex-col items-end gap-2">
+            <div className="flex justify-end gap-2">
+              <Button asChild variant="ghost"><Link to="/admin/membres">Annuler</Link></Button>
+              <Button type="submit" disabled={busy}>
+                <Save className="mr-2 h-4 w-4" /> {busy ? "Enregistrement…" : "Enregistrer le membre"}
+              </Button>
+            </div>
+            {errorDetail && (
+              <div className="w-full rounded-md border border-destructive/40 bg-destructive/5 p-3 text-sm">
+                <div className="font-semibold text-destructive">Échec à l'étape : {errorDetail.step}</div>
+                <div className="mt-1 break-words text-destructive/90">{errorDetail.message}</div>
+                <div className="mt-1 text-xs text-muted-foreground">Détails complets disponibles dans la console (F12).</div>
+              </div>
+            )}
           </div>
         </form>
       </main>
