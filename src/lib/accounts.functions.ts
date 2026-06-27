@@ -64,9 +64,10 @@ export const seedInitialAccounts = createServerFn({ method: "POST" }).handler(
 
     const seeds: Array<{ identifiant: string; password: string; role: AccountRole; display: string }> = [
       { identifiant: "admin",       password: "@DigitOrg",     role: "super_admin",    display: "DigitOrg" },
-      { identifiant: "0759566087",  password: "@Anzrabo2026",  role: "admin_anzrbo",   display: "Admin ANZRBO" },
+      { identifiant: "0759566087",  password: "@Anzrbo2026",   role: "admin_anzrbo",   display: "Admin ANZRBO" },
       { identifiant: "nsia",        password: "@Nsia123",      role: "nsia",           display: "NSIA" },
     ];
+
 
     const results: Array<{ identifiant: string; ok: boolean; error?: string }> = [];
 
