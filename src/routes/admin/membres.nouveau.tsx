@@ -64,6 +64,7 @@ function NouveauMembre() {
   const [preuve, setPreuve] = useState<File | null>(null);
   const [ayants, setAyants] = useState<AyantDroit[]>([{ ...EMPTY_AYANT }]);
   const [busy, setBusy] = useState(false);
+  const [errorDetail, setErrorDetail] = useState<{ step: string; message: string; raw?: any } | null>(null);
 
   function set<K extends keyof typeof form>(k: K, v: any) { setForm((f) => ({ ...f, [k]: v })); }
 
