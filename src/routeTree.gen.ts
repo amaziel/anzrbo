@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
+import { Route as SeedInitRouteImport } from './routes/seed-init'
 import { Route as ScannerRouteImport } from './routes/scanner'
 import { Route as NsiaRouteImport } from './routes/nsia'
 import { Route as LoginRouteImport } from './routes/login'
@@ -23,6 +24,7 @@ import { Route as VerifierTelephoneRouteImport } from './routes/verifier.$teleph
 import { Route as GuideProcedureDecesRouteImport } from './routes/guide.procedure-deces'
 import { Route as AdminNsiaRouteImport } from './routes/admin/nsia'
 import { Route as AdminDiagnosticsRouteImport } from './routes/admin/diagnostics'
+import { Route as AdminDiagnosticRolesRouteImport } from './routes/admin/diagnostic-roles'
 import { Route as AdminCotisationsRouteImport } from './routes/admin/cotisations'
 import { Route as AdminComptesRouteImport } from './routes/admin/comptes'
 import { Route as AdminAssistancesRouteImport } from './routes/admin/assistances'
@@ -34,6 +36,11 @@ import { Route as AdminMembresNouveauRouteImport } from './routes/admin/membres.
 const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
   id: '/sitemap.xml',
   path: '/sitemap.xml',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SeedInitRoute = SeedInitRouteImport.update({
+  id: '/seed-init',
+  path: '/seed-init',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ScannerRoute = ScannerRouteImport.update({
@@ -101,6 +108,11 @@ const AdminDiagnosticsRoute = AdminDiagnosticsRouteImport.update({
   path: '/admin/diagnostics',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminDiagnosticRolesRoute = AdminDiagnosticRolesRouteImport.update({
+  id: '/admin/diagnostic-roles',
+  path: '/admin/diagnostic-roles',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AdminCotisationsRoute = AdminCotisationsRouteImport.update({
   id: '/admin/cotisations',
   path: '/admin/cotisations',
@@ -146,10 +158,12 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/nsia': typeof NsiaRoute
   '/scanner': typeof ScannerRoute
+  '/seed-init': typeof SeedInitRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/admin/assistances': typeof AdminAssistancesRoute
   '/admin/comptes': typeof AdminComptesRoute
   '/admin/cotisations': typeof AdminCotisationsRoute
+  '/admin/diagnostic-roles': typeof AdminDiagnosticRolesRoute
   '/admin/diagnostics': typeof AdminDiagnosticsRoute
   '/admin/nsia': typeof AdminNsiaRouteWithChildren
   '/guide/procedure-deces': typeof GuideProcedureDecesRoute
@@ -169,10 +183,12 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/nsia': typeof NsiaRoute
   '/scanner': typeof ScannerRoute
+  '/seed-init': typeof SeedInitRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/admin/assistances': typeof AdminAssistancesRoute
   '/admin/comptes': typeof AdminComptesRoute
   '/admin/cotisations': typeof AdminCotisationsRoute
+  '/admin/diagnostic-roles': typeof AdminDiagnosticRolesRoute
   '/admin/diagnostics': typeof AdminDiagnosticsRoute
   '/guide/procedure-deces': typeof GuideProcedureDecesRoute
   '/verifier/$telephone': typeof VerifierTelephoneRoute
@@ -192,10 +208,12 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/nsia': typeof NsiaRoute
   '/scanner': typeof ScannerRoute
+  '/seed-init': typeof SeedInitRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/admin/assistances': typeof AdminAssistancesRoute
   '/admin/comptes': typeof AdminComptesRoute
   '/admin/cotisations': typeof AdminCotisationsRoute
+  '/admin/diagnostic-roles': typeof AdminDiagnosticRolesRoute
   '/admin/diagnostics': typeof AdminDiagnosticsRoute
   '/admin/nsia': typeof AdminNsiaRouteWithChildren
   '/guide/procedure-deces': typeof GuideProcedureDecesRoute
@@ -217,10 +235,12 @@ export interface FileRouteTypes {
     | '/login'
     | '/nsia'
     | '/scanner'
+    | '/seed-init'
     | '/sitemap.xml'
     | '/admin/assistances'
     | '/admin/comptes'
     | '/admin/cotisations'
+    | '/admin/diagnostic-roles'
     | '/admin/diagnostics'
     | '/admin/nsia'
     | '/guide/procedure-deces'
@@ -240,10 +260,12 @@ export interface FileRouteTypes {
     | '/login'
     | '/nsia'
     | '/scanner'
+    | '/seed-init'
     | '/sitemap.xml'
     | '/admin/assistances'
     | '/admin/comptes'
     | '/admin/cotisations'
+    | '/admin/diagnostic-roles'
     | '/admin/diagnostics'
     | '/guide/procedure-deces'
     | '/verifier/$telephone'
@@ -262,10 +284,12 @@ export interface FileRouteTypes {
     | '/login'
     | '/nsia'
     | '/scanner'
+    | '/seed-init'
     | '/sitemap.xml'
     | '/admin/assistances'
     | '/admin/comptes'
     | '/admin/cotisations'
+    | '/admin/diagnostic-roles'
     | '/admin/diagnostics'
     | '/admin/nsia'
     | '/guide/procedure-deces'
@@ -286,10 +310,12 @@ export interface RootRouteChildren {
   LoginRoute: typeof LoginRoute
   NsiaRoute: typeof NsiaRoute
   ScannerRoute: typeof ScannerRoute
+  SeedInitRoute: typeof SeedInitRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
   AdminAssistancesRoute: typeof AdminAssistancesRoute
   AdminComptesRoute: typeof AdminComptesRoute
   AdminCotisationsRoute: typeof AdminCotisationsRoute
+  AdminDiagnosticRolesRoute: typeof AdminDiagnosticRolesRoute
   AdminDiagnosticsRoute: typeof AdminDiagnosticsRoute
   AdminNsiaRoute: typeof AdminNsiaRouteWithChildren
   GuideProcedureDecesRoute: typeof GuideProcedureDecesRoute
@@ -306,6 +332,13 @@ declare module '@tanstack/react-router' {
       path: '/sitemap.xml'
       fullPath: '/sitemap.xml'
       preLoaderRoute: typeof SitemapDotxmlRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/seed-init': {
+      id: '/seed-init'
+      path: '/seed-init'
+      fullPath: '/seed-init'
+      preLoaderRoute: typeof SeedInitRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/scanner': {
@@ -399,6 +432,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminDiagnosticsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin/diagnostic-roles': {
+      id: '/admin/diagnostic-roles'
+      path: '/admin/diagnostic-roles'
+      fullPath: '/admin/diagnostic-roles'
+      preLoaderRoute: typeof AdminDiagnosticRolesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/admin/cotisations': {
       id: '/admin/cotisations'
       path: '/admin/cotisations'
@@ -474,10 +514,12 @@ const rootRouteChildren: RootRouteChildren = {
   LoginRoute: LoginRoute,
   NsiaRoute: NsiaRoute,
   ScannerRoute: ScannerRoute,
+  SeedInitRoute: SeedInitRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,
   AdminAssistancesRoute: AdminAssistancesRoute,
   AdminComptesRoute: AdminComptesRoute,
   AdminCotisationsRoute: AdminCotisationsRoute,
+  AdminDiagnosticRolesRoute: AdminDiagnosticRolesRoute,
   AdminDiagnosticsRoute: AdminDiagnosticsRoute,
   AdminNsiaRoute: AdminNsiaRouteWithChildren,
   GuideProcedureDecesRoute: GuideProcedureDecesRoute,

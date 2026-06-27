@@ -64,11 +64,13 @@ function NouveauMembre() {
   const [preuve, setPreuve] = useState<File | null>(null);
   const [ayants, setAyants] = useState<AyantDroit[]>([{ ...EMPTY_AYANT }]);
   const [busy, setBusy] = useState(false);
+  const [errorDetail, setErrorDetail] = useState<{ step: string; message: string; raw?: any } | null>(null);
 
   function set<K extends keyof typeof form>(k: K, v: any) { setForm((f) => ({ ...f, [k]: v })); }
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
+    setErrorDetail(null);
     if (!photo) return toast.error("Photo du membre obligatoire.");
     if (!form.nom || !form.prenoms || !form.telephone || !form.village || !form.dateNaissance || !form.lieuNaissance) {
       return toast.error("Champs obligatoires manquants.");
@@ -77,17 +79,18 @@ function NouveauMembre() {
     if (form.typePreuve === "photo_document" && !preuve) return toast.error("Justificatif (photo/document) obligatoire.");
 
     setBusy(true);
+    let step = "init";
     try {
-      // 1) Upload photo (compressée)
+      step = "upload_photo";
       const blob = await compressImage(photo, 1024, 0.8);
       const f = new File([blob], `photo-${Date.now()}.jpg`, { type: "image/jpeg" });
       const b64 = await fileToBase64(f);
       const path = `${Date.now()}-${form.telephone.replace(/\D/g, "")}.jpg`;
       const photoRes = await uploadFileFn({ data: { bucket: "member-photos", path, base64: b64, contentType: "image/jpeg" } });
 
-      // 2) Upload justificatif si présent
       let justificatifUrl: string | null = null;
       if (form.typePreuve === "photo_document" && preuve) {
+        step = "upload_justificatif";
         const pb = preuve.type.startsWith("image/") ? await compressImage(preuve, 1600, 0.85) : preuve;
         const pf = new File([pb], preuve.name, { type: pb.type || preuve.type });
         const pbb64 = await fileToBase64(pf);
@@ -96,7 +99,7 @@ function NouveauMembre() {
         justificatifUrl = r.url;
       }
 
-      // 3) Création membre + ayants droit + paiement inscription
+      step = "create_member";
       const res = await createMemberFn({
         data: {
           nom: form.nom, prenoms: form.prenoms,
@@ -121,10 +124,25 @@ function NouveauMembre() {
           },
         }
       });
+
+      step = "photo_health";
+      if (photoRes.url) {
+        await new Promise<void>((resolve) => {
+          const img = new Image();
+          img.onload = () => resolve();
+          img.onerror = () => { console.warn("[photo_health] photo non lisible:", photoRes.url); resolve(); };
+          img.src = photoRes.url!;
+          setTimeout(resolve, 4000);
+        });
+      }
+
       toast.success(`Membre enregistré : ${res.member.numero_membre}`);
       setTimeout(() => nav({ to: "/admin/membres" }), 600);
     } catch (err: any) {
-      toast.error(err?.message ?? "Erreur lors de l'enregistrement");
+      const message = err?.message ?? String(err) ?? "Erreur inconnue";
+      console.error(`[membre/nouveau][${step}]`, err);
+      setErrorDetail({ step, message, raw: err });
+      toast.error(`${step} — ${message}`);
     } finally {
       setBusy(false);
     }
@@ -227,11 +245,20 @@ function NouveauMembre() {
             </CardContent>
           </Card>
 
-          <div className="flex justify-end gap-2">
-            <Button asChild variant="ghost"><Link to="/admin/membres">Annuler</Link></Button>
-            <Button type="submit" disabled={busy}>
-              <Save className="mr-2 h-4 w-4" /> {busy ? "Enregistrement…" : "Enregistrer le membre"}
-            </Button>
+          <div className="flex flex-col items-end gap-2">
+            <div className="flex justify-end gap-2">
+              <Button asChild variant="ghost"><Link to="/admin/membres">Annuler</Link></Button>
+              <Button type="submit" disabled={busy}>
+                <Save className="mr-2 h-4 w-4" /> {busy ? "Enregistrement…" : "Enregistrer le membre"}
+              </Button>
+            </div>
+            {errorDetail && (
+              <div className="w-full rounded-md border border-destructive/40 bg-destructive/5 p-3 text-sm">
+                <div className="font-semibold text-destructive">Échec à l'étape : {errorDetail.step}</div>
+                <div className="mt-1 break-words text-destructive/90">{errorDetail.message}</div>
+                <div className="mt-1 text-xs text-muted-foreground">Détails complets disponibles dans la console (F12).</div>
+              </div>
+            )}
           </div>
         </form>
       </main>
