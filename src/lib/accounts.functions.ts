@@ -36,6 +36,16 @@ function emailForIdentifier(identifiant: string, role: AccountRole): string {
   return `${id}@${domain}`;
 }
 
+/** Map a logical AccountRole to a value that exists in public.app_role today.
+ *  Falls back to admin_national for values not yet added to the enum. */
+function dbRoleFor(role: AccountRole): string {
+  if (role === "super_admin") return "super_admin";
+  if (role === "agent_saisie") return "agent_saisie";
+  // admin_anzrbo & nsia: enum may not contain them yet — use admin_national
+  return "admin_national";
+}
+
+
 async function assertSuperAdmin(supabase: any, userId: string) {
   const { data, error } = await supabase.rpc("has_role", {
     _user_id: userId,
