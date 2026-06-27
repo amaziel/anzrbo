@@ -24,6 +24,7 @@ import { Route as VerifierTelephoneRouteImport } from './routes/verifier.$teleph
 import { Route as GuideProcedureDecesRouteImport } from './routes/guide.procedure-deces'
 import { Route as AdminNsiaRouteImport } from './routes/admin/nsia'
 import { Route as AdminDiagnosticsRouteImport } from './routes/admin/diagnostics'
+import { Route as AdminDiagnosticRolesRouteImport } from './routes/admin/diagnostic-roles'
 import { Route as AdminCotisationsRouteImport } from './routes/admin/cotisations'
 import { Route as AdminComptesRouteImport } from './routes/admin/comptes'
 import { Route as AdminAssistancesRouteImport } from './routes/admin/assistances'
@@ -107,6 +108,11 @@ const AdminDiagnosticsRoute = AdminDiagnosticsRouteImport.update({
   path: '/admin/diagnostics',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminDiagnosticRolesRoute = AdminDiagnosticRolesRouteImport.update({
+  id: '/admin/diagnostic-roles',
+  path: '/admin/diagnostic-roles',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AdminCotisationsRoute = AdminCotisationsRouteImport.update({
   id: '/admin/cotisations',
   path: '/admin/cotisations',
@@ -157,6 +163,7 @@ export interface FileRoutesByFullPath {
   '/admin/assistances': typeof AdminAssistancesRoute
   '/admin/comptes': typeof AdminComptesRoute
   '/admin/cotisations': typeof AdminCotisationsRoute
+  '/admin/diagnostic-roles': typeof AdminDiagnosticRolesRoute
   '/admin/diagnostics': typeof AdminDiagnosticsRoute
   '/admin/nsia': typeof AdminNsiaRouteWithChildren
   '/guide/procedure-deces': typeof GuideProcedureDecesRoute
@@ -181,6 +188,7 @@ export interface FileRoutesByTo {
   '/admin/assistances': typeof AdminAssistancesRoute
   '/admin/comptes': typeof AdminComptesRoute
   '/admin/cotisations': typeof AdminCotisationsRoute
+  '/admin/diagnostic-roles': typeof AdminDiagnosticRolesRoute
   '/admin/diagnostics': typeof AdminDiagnosticsRoute
   '/guide/procedure-deces': typeof GuideProcedureDecesRoute
   '/verifier/$telephone': typeof VerifierTelephoneRoute
@@ -205,6 +213,7 @@ export interface FileRoutesById {
   '/admin/assistances': typeof AdminAssistancesRoute
   '/admin/comptes': typeof AdminComptesRoute
   '/admin/cotisations': typeof AdminCotisationsRoute
+  '/admin/diagnostic-roles': typeof AdminDiagnosticRolesRoute
   '/admin/diagnostics': typeof AdminDiagnosticsRoute
   '/admin/nsia': typeof AdminNsiaRouteWithChildren
   '/guide/procedure-deces': typeof GuideProcedureDecesRoute
@@ -231,6 +240,7 @@ export interface FileRouteTypes {
     | '/admin/assistances'
     | '/admin/comptes'
     | '/admin/cotisations'
+    | '/admin/diagnostic-roles'
     | '/admin/diagnostics'
     | '/admin/nsia'
     | '/guide/procedure-deces'
@@ -255,6 +265,7 @@ export interface FileRouteTypes {
     | '/admin/assistances'
     | '/admin/comptes'
     | '/admin/cotisations'
+    | '/admin/diagnostic-roles'
     | '/admin/diagnostics'
     | '/guide/procedure-deces'
     | '/verifier/$telephone'
@@ -278,6 +289,7 @@ export interface FileRouteTypes {
     | '/admin/assistances'
     | '/admin/comptes'
     | '/admin/cotisations'
+    | '/admin/diagnostic-roles'
     | '/admin/diagnostics'
     | '/admin/nsia'
     | '/guide/procedure-deces'
@@ -303,6 +315,7 @@ export interface RootRouteChildren {
   AdminAssistancesRoute: typeof AdminAssistancesRoute
   AdminComptesRoute: typeof AdminComptesRoute
   AdminCotisationsRoute: typeof AdminCotisationsRoute
+  AdminDiagnosticRolesRoute: typeof AdminDiagnosticRolesRoute
   AdminDiagnosticsRoute: typeof AdminDiagnosticsRoute
   AdminNsiaRoute: typeof AdminNsiaRouteWithChildren
   GuideProcedureDecesRoute: typeof GuideProcedureDecesRoute
@@ -419,6 +432,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminDiagnosticsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin/diagnostic-roles': {
+      id: '/admin/diagnostic-roles'
+      path: '/admin/diagnostic-roles'
+      fullPath: '/admin/diagnostic-roles'
+      preLoaderRoute: typeof AdminDiagnosticRolesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/admin/cotisations': {
       id: '/admin/cotisations'
       path: '/admin/cotisations'
@@ -499,6 +519,7 @@ const rootRouteChildren: RootRouteChildren = {
   AdminAssistancesRoute: AdminAssistancesRoute,
   AdminComptesRoute: AdminComptesRoute,
   AdminCotisationsRoute: AdminCotisationsRoute,
+  AdminDiagnosticRolesRoute: AdminDiagnosticRolesRoute,
   AdminDiagnosticsRoute: AdminDiagnosticsRoute,
   AdminNsiaRoute: AdminNsiaRouteWithChildren,
   GuideProcedureDecesRoute: GuideProcedureDecesRoute,
