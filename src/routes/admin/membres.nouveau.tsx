@@ -70,6 +70,7 @@ function NouveauMembre() {
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
+    setErrorDetail(null);
     if (!photo) return toast.error("Photo du membre obligatoire.");
     if (!form.nom || !form.prenoms || !form.telephone || !form.village || !form.dateNaissance || !form.lieuNaissance) {
       return toast.error("Champs obligatoires manquants.");
@@ -78,17 +79,18 @@ function NouveauMembre() {
     if (form.typePreuve === "photo_document" && !preuve) return toast.error("Justificatif (photo/document) obligatoire.");
 
     setBusy(true);
+    let step = "init";
     try {
-      // 1) Upload photo (compressée)
+      step = "upload_photo";
       const blob = await compressImage(photo, 1024, 0.8);
       const f = new File([blob], `photo-${Date.now()}.jpg`, { type: "image/jpeg" });
       const b64 = await fileToBase64(f);
       const path = `${Date.now()}-${form.telephone.replace(/\D/g, "")}.jpg`;
       const photoRes = await uploadFileFn({ data: { bucket: "member-photos", path, base64: b64, contentType: "image/jpeg" } });
 
-      // 2) Upload justificatif si présent
       let justificatifUrl: string | null = null;
       if (form.typePreuve === "photo_document" && preuve) {
+        step = "upload_justificatif";
         const pb = preuve.type.startsWith("image/") ? await compressImage(preuve, 1600, 0.85) : preuve;
         const pf = new File([pb], preuve.name, { type: pb.type || preuve.type });
         const pbb64 = await fileToBase64(pf);
@@ -97,7 +99,7 @@ function NouveauMembre() {
         justificatifUrl = r.url;
       }
 
-      // 3) Création membre + ayants droit + paiement inscription
+      step = "create_member";
       const res = await createMemberFn({
         data: {
           nom: form.nom, prenoms: form.prenoms,
@@ -122,10 +124,25 @@ function NouveauMembre() {
           },
         }
       });
+
+      step = "photo_health";
+      if (photoRes.url) {
+        await new Promise<void>((resolve) => {
+          const img = new Image();
+          img.onload = () => resolve();
+          img.onerror = () => { console.warn("[photo_health] photo non lisible:", photoRes.url); resolve(); };
+          img.src = photoRes.url!;
+          setTimeout(resolve, 4000);
+        });
+      }
+
       toast.success(`Membre enregistré : ${res.member.numero_membre}`);
       setTimeout(() => nav({ to: "/admin/membres" }), 600);
     } catch (err: any) {
-      toast.error(err?.message ?? "Erreur lors de l'enregistrement");
+      const message = err?.message ?? String(err) ?? "Erreur inconnue";
+      console.error(`[membre/nouveau][${step}]`, err);
+      setErrorDetail({ step, message, raw: err });
+      toast.error(`${step} — ${message}`);
     } finally {
       setBusy(false);
     }
