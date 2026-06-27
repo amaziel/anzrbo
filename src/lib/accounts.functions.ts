@@ -36,6 +36,16 @@ function emailForIdentifier(identifiant: string, role: AccountRole): string {
   return `${id}@${domain}`;
 }
 
+/** Map a logical AccountRole to a value that exists in public.app_role today.
+ *  Falls back to admin_national for values not yet added to the enum. */
+function dbRoleFor(role: AccountRole): string {
+  if (role === "super_admin") return "super_admin";
+  if (role === "agent_saisie") return "agent_saisie";
+  // admin_anzrbo & nsia: enum may not contain them yet — use admin_national
+  return "admin_national";
+}
+
+
 async function assertSuperAdmin(supabase: any, userId: string) {
   const { data, error } = await supabase.rpc("has_role", {
     _user_id: userId,
@@ -64,9 +74,10 @@ export const seedInitialAccounts = createServerFn({ method: "POST" }).handler(
 
     const seeds: Array<{ identifiant: string; password: string; role: AccountRole; display: string }> = [
       { identifiant: "admin",       password: "@DigitOrg",     role: "super_admin",    display: "DigitOrg" },
-      { identifiant: "0759566087",  password: "@Anzrabo2026",  role: "admin_anzrbo",   display: "Admin ANZRBO" },
+      { identifiant: "0759566087",  password: "@Anzrbo2026",   role: "admin_anzrbo",   display: "Admin ANZRBO" },
       { identifiant: "nsia",        password: "@Nsia123",      role: "nsia",           display: "NSIA" },
     ];
+
 
     const results: Array<{ identifiant: string; ok: boolean; error?: string }> = [];
 
@@ -98,7 +109,7 @@ export const seedInitialAccounts = createServerFn({ method: "POST" }).handler(
       // 3) upsert user_roles
       const { error: e2 } = await (supabaseAdmin as any)
         .from("user_roles")
-        .upsert({ user_id: userId, role: s.role }, { onConflict: "user_id,role" });
+        .upsert({ user_id: userId, role: dbRoleFor(s.role) }, { onConflict: "user_id,role" });
       if (e2) { results.push({ identifiant: s.identifiant, ok: false, error: e2.message }); continue; }
 
       results.push({ identifiant: s.identifiant, ok: true });
@@ -180,7 +191,7 @@ export const createAccount = createServerFn({ method: "POST" })
     if (e1) throw new Error(e1.message);
 
     const { error: e2 } = await (supabaseAdmin as any).from("user_roles")
-      .insert({ user_id: userId, role: data.role });
+      .insert({ user_id: userId, role: dbRoleFor(data.role) });
     if (e2) throw new Error(e2.message);
 
     return { ok: true, user_id: userId };

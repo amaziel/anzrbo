@@ -25,13 +25,16 @@ export type MemberRow = {
 };
 
 async function assertAnzrboAdmin(supabase: any, userId: string) {
-  const roles = ["admin_anzrbo", "super_admin"];
+  const roles = ["super_admin", "admin_national", "admin_anzrbo"];
   for (const r of roles) {
-    const { data } = await supabase.rpc("has_role", { _user_id: userId, _role: r });
-    if (data) return;
+    try {
+      const { data, error } = await supabase.rpc("has_role", { _user_id: userId, _role: r });
+      if (!error && data) return;
+    } catch { /* enum value may not exist yet — try next */ }
   }
   throw new Error("Forbidden");
 }
+
 
 function genNumero() {
   const y = new Date().getFullYear();
