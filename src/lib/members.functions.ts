@@ -271,6 +271,30 @@ export const addPaiement = createServerFn({ method: "POST" })
     return { ok: true, paiement: row };
   });
 
+/** Vérification publique QR / téléphone / numéro membre. */
+export const verifyMemberPublic = createServerFn({ method: "POST" })
+  .inputValidator((data: { q: string }) => {
+    if (!data?.q?.trim()) throw new Error("Identifiant requis");
+    return { q: data.q.trim() };
+  })
+  .handler(async ({ data }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const raw = data.q;
+    const digits = raw.replace(/\D/g, "");
+    let query = (supabaseAdmin as any)
+      .from("members")
+      .select("id,numero_membre,photo_url,nom,prenoms,telephone,contact2,ville,quartier,adresse,date_naissance,lieu_naissance,date_inscription,statut")
+      .limit(1);
+    if (digits) {
+      query = query.or(`telephone.eq.${digits},contact2.eq.${digits},telephone.eq.${raw},contact2.eq.${raw},numero_membre.eq.${raw}`);
+    } else {
+      query = query.eq("numero_membre", raw);
+    }
+    const { data: rows, error } = await query;
+    if (error) throw new Error(error.message);
+    return { member: rows?.[0] ?? null };
+  });
+
 /** Upload binaire base64 dans un bucket storage (admin). */
 export const uploadFile = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])

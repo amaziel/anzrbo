@@ -41,6 +41,9 @@ export default defineConfig(({ mode }) => {
           client: { files: ["**/server/**"], specifiers: ["server-only"] },
         },
         server: { entry: "server" },
+        router: {
+          codeSplittingOptions: { defaultBehavior: [] },
+        },
       }),
       nitro({
         preset: "vercel",

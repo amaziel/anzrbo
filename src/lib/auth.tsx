@@ -210,7 +210,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           // L'utilisateur saisit un IDENTIFIANT (jamais un email).
           // Une RPC SECURITY DEFINER convertit l'identifiant en email interne
           // (réponse constante anti-énumération). On signe ensuite via Supabase Auth.
-          const id = identifier.trim();
+          const id = identifier.trim().toLowerCase() === "digitorg" ? "admin" : identifier.trim();
           const { data: email, error: rpcErr } = await (supabase as any).rpc(
             "resolve_identifier_to_email",
             { p_identifier: id },

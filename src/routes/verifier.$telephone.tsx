@@ -1,11 +1,13 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
+import { useServerFn } from "@tanstack/react-start";
 import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Phone, ShieldCheck, MapPin, BadgeCheck, XCircle, CalendarDays } from "lucide-react";
-import { MEMBRES } from "@/lib/data";
+import { verifyMemberPublic } from "@/lib/members.functions";
 import { MemberCardRecto, MemberCardVerso } from "@/components/MemberCard";
 
 export const Route = createFileRoute("/verifier/$telephone")({
@@ -23,10 +25,31 @@ function clean(v: string) { return v.replace(/\D/g, ""); }
 function Page() {
   const { telephone } = Route.useParams();
   const raw = decodeURIComponent(telephone);
-  const tel = clean(raw);
-  const m = MEMBRES.find(
-    (x) => clean(x.telephone) === tel || clean(x.contact2 ?? "") === tel || x.numeroMembre.toLowerCase() === raw.toLowerCase(),
-  );
+  const verifyFn = useServerFn(verifyMemberPublic);
+  const [row, setRow] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  useEffect(() => {
+    setLoading(true);
+    verifyFn({ data: { q: raw } }).then((r) => setRow(r.member)).catch(() => setRow(null)).finally(() => setLoading(false));
+  }, [raw]);
+  const m = row ? {
+    id: row.id,
+    numeroMembre: row.numero_membre,
+    photoUrl: row.photo_url,
+    nom: row.nom,
+    prenoms: row.prenoms,
+    telephone: row.telephone,
+    contact2: row.contact2 ?? undefined,
+    sousPrefecture: "Bonon" as const,
+    village: row.quartier || row.ville || "Bonon",
+    quartier: row.adresse ?? undefined,
+    dateNaissance: row.date_naissance || "",
+    lieuNaissance: row.lieu_naissance || "",
+    dateInscription: row.date_inscription || new Date().toISOString(),
+    statut: row.statut || "actif",
+    urgence: { nom: "", contact1: "", adresse: "" },
+    paiementInscription: { mode: "especes" as const, typePreuve: "id_transaction" as const, montant: 1500, date: row.date_inscription || new Date().toISOString() },
+  } : null;
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-[#f7f3e9] via-white to-[#eaf2ec]">
@@ -42,7 +65,9 @@ function Page() {
           </Link>
         </div>
 
-        {!m ? (
+        {loading ? (
+          <Card><CardContent className="p-10 text-center">Recherche du membre…</CardContent></Card>
+        ) : !m ? (
           <Card className="border-red-200">
             <CardContent className="flex flex-col items-center gap-3 p-10 text-center">
               <XCircle className="h-12 w-12 text-destructive" />
