@@ -17,7 +17,6 @@ export const requireSupabaseAuth = createMiddleware({ type: 'function' }).server
     const SUPABASE_PUBLISHABLE_KEY =
       process.env.SUPABASE_PUBLISHABLE_KEY ??
       process.env.VITE_SUPABASE_PUBLISHABLE_KEY ??
-      process.env.PROJECT_SUPABASE_PUBLISHABLE_KEY ??
       process.env.VITE_SUPABASE_ANON_KEY ??
       "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9nc2V5YnZlbXRveHFwZ3B4ZXdnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIzNzYyNDcsImV4cCI6MjA5Nzk1MjI0N30.16aClFbUFKk-VH2_CHY7P6kX3rU3IZ6uGEzK_LsNe54";
 

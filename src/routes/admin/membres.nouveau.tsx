@@ -58,6 +58,7 @@ function NouveauMembre() {
     mode: "especes" as "especes" | "mobile_money",
     typePreuve: "id_transaction" as "id_transaction" | "photo_document",
     idTransaction: "",
+    urgenceNom: "", urgenceContact1: "", urgenceContact2: "", urgenceAdresse: "",
     notes: "",
   });
   const [photo, setPhoto] = useState<File | null>(null);
@@ -108,7 +109,15 @@ function NouveauMembre() {
           date_naissance: form.dateNaissance, lieu_naissance: form.lieuNaissance,
           ville: form.sousPrefecture, quartier: form.village, adresse: form.quartier || null,
           photo_url: photoRes.url,
-          notes: form.notes || null,
+          notes: JSON.stringify({
+            commentaire: form.notes || null,
+            contact_urgence: {
+              nom: form.urgenceNom || null,
+              contact1: form.urgenceContact1 || null,
+              contact2: form.urgenceContact2 || null,
+              adresse: form.urgenceAdresse || null,
+            },
+          }),
           ayants: ayants.filter(a => a.type && a.nom).map(a => ({
             nom: a.nom,
             relation: relationToEnum(a.type),
@@ -207,6 +216,19 @@ function NouveauMembre() {
             </CardHeader>
             <CardContent>
               <AyantsDroitFields value={ayants} onChange={setAyants} max={8} />
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Contact d'urgence</CardTitle>
+              <CardDescription>Personne à joindre rapidement en cas de besoin concernant le membre principal.</CardDescription>
+            </CardHeader>
+            <CardContent className="grid gap-4 md:grid-cols-2">
+              <Field label="Nom du contact"><Input value={form.urgenceNom} onChange={(e) => set("urgenceNom", e.target.value)} /></Field>
+              <Field label="Contact 1"><Input type="tel" value={form.urgenceContact1} onChange={(e) => set("urgenceContact1", e.target.value)} /></Field>
+              <Field label="Contact 2"><Input type="tel" value={form.urgenceContact2} onChange={(e) => set("urgenceContact2", e.target.value)} /></Field>
+              <Field label="Adresse"><Input value={form.urgenceAdresse} onChange={(e) => set("urgenceAdresse", e.target.value)} /></Field>
             </CardContent>
           </Card>
 
