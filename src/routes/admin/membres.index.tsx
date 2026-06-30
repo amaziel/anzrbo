@@ -7,11 +7,12 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { useAuth, clientRoleGuard } from "@/lib/auth";
 import { listMembers, getMember, deleteMember, addPaiement, uploadFile, type MemberRow } from "@/lib/members.functions";
-import { Search, Users, Eye, Trash2, Receipt, ChevronLeft, ChevronRight } from "lucide-react";
+import { Search, Users, Eye, Trash2, Receipt, ChevronLeft, ChevronRight, Printer, QrCode } from "lucide-react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/admin/membres/")({
@@ -39,13 +40,14 @@ function ListeMembres() {
   const qc = useQueryClient();
 
   const [q, setQ] = useState("");
+  const [statut, setStatut] = useState("tous");
   const [page, setPage] = useState(1);
   const pageSize = 20;
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
   const { data, isLoading } = useQuery({
-    queryKey: ["members", q, page],
-    queryFn: () => listFn({ data: { q, page, pageSize } }),
+    queryKey: ["members", q, statut, page],
+    queryFn: () => listFn({ data: { q, page, pageSize, statut: statut === "tous" ? "" : statut } }),
     enabled: !!user,
   });
 
@@ -77,6 +79,15 @@ function ListeMembres() {
                 <Input className="w-full pl-9 sm:w-80" placeholder="Nom, téléphone, n° membre…"
                   value={q} onChange={(e) => { setQ(e.target.value); setPage(1); }} />
               </div>
+              <Select value={statut} onValueChange={(v) => { setStatut(v); setPage(1); }}>
+                <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="tous">Tous statuts</SelectItem>
+                  <SelectItem value="actif">Actifs</SelectItem>
+                  <SelectItem value="suspendu">Suspendus</SelectItem>
+                  <SelectItem value="decede">Décédés</SelectItem>
+                </SelectContent>
+              </Select>
               <Button asChild><Link to="/admin/membres/nouveau">+ Nouveau membre</Link></Button>
             </div>
           </CardHeader>
@@ -112,6 +123,8 @@ function ListeMembres() {
                     <TableCell className="text-xs text-muted-foreground">{m.date_inscription ?? "—"}</TableCell>
                     <TableCell className="text-right">
                       <Button size="sm" variant="ghost" onClick={() => setSelectedId(m.id)}><Eye className="h-4 w-4" /></Button>
+                      <Button size="sm" variant="ghost" onClick={() => window.open(`/verifier/${encodeURIComponent(m.numero_membre)}`, "_blank")} title="Aperçu carte / QR"><QrCode className="h-4 w-4" /></Button>
+                      <Button size="sm" variant="ghost" onClick={() => window.open(`/verifier/${encodeURIComponent(m.numero_membre)}?print=1`, "_blank")} title="Imprimer carte"><Printer className="h-4 w-4" /></Button>
                       <Button size="sm" variant="ghost" onClick={() => {
                         if (confirm(`Supprimer ${m.prenoms} ${m.nom} ?`)) delMut.mutate(m.id);
                       }}><Trash2 className="h-4 w-4 text-rose-600" /></Button>
