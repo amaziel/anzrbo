@@ -104,13 +104,25 @@ export type AyantInput = {
 };
 
 export type PaiementInput = {
-  type: string; // 'inscription'|'cotisation'|'nsia'|...
+  type: string; // UI values are normalized to the current SQL enum.
   montant: number;
   methode?: string | null;
   reference_externe?: string | null;
   justificatif_url?: string | null;
   periode?: string | null;
 };
+
+function normalizePaiementType(type?: string | null): "cotisation" | "nsia" | "assistance" | "autre" {
+  if (type === "cotisation" || type === "nsia" || type === "assistance" || type === "autre") return type;
+  // The current production enum does not contain inscription/adhesion/deces.
+  // Registration fees are therefore stored as `autre` with explicit notes/reference.
+  return "autre";
+}
+
+function detailedSupabaseError(scope: string, error: any) {
+  const parts = [scope, error?.code, error?.message, error?.details, error?.hint].filter(Boolean);
+  return new Error(parts.join(" — "));
+}
 
 export type MemberInput = {
   nom: string;
@@ -167,7 +179,7 @@ export const createMember = createServerFn({ method: "POST" })
       })
       .select("*")
       .single();
-    if (error) throw new Error(error.message);
+    if (error) throw detailedSupabaseError("Membre", error);
 
     if (data.ayants?.length) {
       const rows = data.ayants
@@ -175,7 +187,7 @@ export const createMember = createServerFn({ method: "POST" })
         .map((a) => ({
           member_id: m.id,
           nom: a.nom,
-          prenoms: a.prenoms || null,
+          prenoms: a.prenoms || "—",
           relation: a.relation,
           date_naissance: a.date_naissance || null,
           sexe: a.sexe || null,
@@ -184,7 +196,7 @@ export const createMember = createServerFn({ method: "POST" })
         }));
       if (rows.length) {
         const { error: e2 } = await (supabaseAdmin as any).from("ayants_droit").insert(rows);
-        if (e2) throw new Error("Ayants droit: " + e2.message);
+          if (e2) throw detailedSupabaseError("Ayants droit", e2);
       }
     }
 
@@ -192,23 +204,33 @@ export const createMember = createServerFn({ method: "POST" })
       const p = data.paiement_inscription;
       const { error: e3 } = await (supabaseAdmin as any).from("paiements").insert({
         member_id: m.id,
-        type: p.type || "inscription",
+        type: normalizePaiementType(p.type),
         montant: p.montant ?? 1500,
-        statut: "payee",
+        statut: "paye",
         methode: p.methode || null,
         reference_externe: p.reference_externe || null,
         justificatif_url: p.justificatif_url || null,
         paye_le: new Date().toISOString(),
         encaisse_par: context.userId,
+        notes: p.type && normalizePaiementType(p.type) !== p.type ? `Type UI: ${p.type}` : null,
       });
-      if (e3) throw new Error("Paiement inscription: " + e3.message);
+      if (e3) throw detailedSupabaseError("Paiement inscription", e3);
     }
 
-    // Carte initiale (placeholder)
-    const qrPayload = JSON.stringify({ n: numero, t: data.telephone, v: 1 });
-    await (supabaseAdmin as any).from("member_cards").insert({
-      member_id: m.id, version: 1, qr_payload: qrPayload, active: true, created_by: context.userId,
-    });
+    // La base génère déjà la carte active via trigger. Si le trigger est absent,
+    // on crée une carte de secours sans casser l'inscription.
+    const { count: cardCount } = await (supabaseAdmin as any)
+      .from("member_cards")
+      .select("id", { count: "exact", head: true })
+      .eq("member_id", m.id)
+      .eq("active", true);
+    if ((cardCount ?? 0) === 0) {
+      const qrPayload = `${process.env.PUBLIC_SITE_URL ?? "https://anzrbo1.lovable.app"}/verifier/${encodeURIComponent(numero)}`;
+      const { error: cardError } = await (supabaseAdmin as any).from("member_cards").insert({
+        member_id: m.id, version: 1, qr_payload: qrPayload, active: true, created_by: context.userId,
+      });
+      if (cardError) console.warn("[createMember][member_cards]", cardError.message);
+    }
 
     return { ok: true, member: m as MemberRow };
   });
@@ -245,7 +267,7 @@ export const updateMember = createServerFn({ method: "POST" })
       ...data.patch,
       updated_at: new Date().toISOString(),
     }).eq("id", data.id);
-    if (error) throw new Error(error.message);
+    if (error) throw detailedSupabaseError("Modification membre", error);
     return { ok: true };
   });
 
@@ -259,7 +281,7 @@ export const deleteMember = createServerFn({ method: "POST" })
     await assertAnzrboAdmin(context.supabase, context.userId);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { error } = await (supabaseAdmin as any).from("members").delete().eq("id", data.id);
-    if (error) throw new Error(error.message);
+    if (error) throw detailedSupabaseError("Suppression membre", error);
     return { ok: true };
   });
 
@@ -276,17 +298,17 @@ export const addPaiement = createServerFn({ method: "POST" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: row, error } = await (supabaseAdmin as any).from("paiements").insert({
       member_id: data.member_id,
-      type: data.paiement.type,
+      type: normalizePaiementType(data.paiement.type),
       montant: data.paiement.montant,
       methode: data.paiement.methode || null,
       reference_externe: data.paiement.reference_externe || null,
       justificatif_url: data.paiement.justificatif_url || null,
       periode: data.paiement.periode || null,
-      statut: "payee",
+      statut: "paye",
       paye_le: new Date().toISOString(),
       encaisse_par: context.userId,
     }).select("*").single();
-    if (error) throw new Error(error.message);
+    if (error) throw detailedSupabaseError("Paiement", error);
     return { ok: true, paiement: row };
   });
 
