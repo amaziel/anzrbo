@@ -320,7 +320,13 @@ export const verifyMemberPublic = createServerFn({ method: "POST" })
   })
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const raw = data.q;
+    let raw = data.q;
+    try {
+      const parsed = JSON.parse(raw);
+      raw = String(parsed?.n ?? parsed?.numero_membre ?? parsed?.telephone ?? raw);
+    } catch { /* QR texte classique */ }
+    const match = raw.match(/(?:\/m\/|\/verifier\/)([^/?#]+)/i);
+    if (match) raw = decodeURIComponent(match[1]);
     const digits = raw.replace(/\D/g, "");
     let query = (supabaseAdmin as any)
       .from("members")

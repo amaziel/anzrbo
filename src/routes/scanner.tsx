@@ -21,6 +21,12 @@ export const Route = createFileRoute("/scanner")({
 function parseTelephone(raw: string): string | null {
   const v = raw.trim();
   if (!v) return null;
+  try {
+    const parsed = JSON.parse(v);
+    if (parsed?.n) return String(parsed.n);
+    if (parsed?.numero_membre) return String(parsed.numero_membre);
+    if (parsed?.telephone) return String(parsed.telephone);
+  } catch { /* QR texte classique */ }
   // Accepte une URL .../verifier/0700000000 ou un numéro brut
   const m = v.match(/(?:\/m\/|\/verifier\/)([^/?#]+)/i);
   if (m) return decodeURIComponent(m[1]);
