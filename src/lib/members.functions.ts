@@ -331,6 +331,29 @@ export const uploadFile = createServerFn({ method: "POST" })
       .from(data.bucket)
       .upload(data.path, buf, { contentType: data.contentType, upsert: true });
     if (error) throw new Error(error.message);
-    const { data: pub } = (supabaseAdmin as any).storage.from(data.bucket).getPublicUrl(data.path);
-    return { ok: true, path: data.path, url: pub?.publicUrl ?? null };
+    // Buckets are private — return a signed URL. Short-lived for sensitive
+    // documents (justificatifs de paiement), long-lived for affichage carte.
+    const expiresIn = data.bucket === "payment-proofs" ? 60 * 10 : 60 * 60 * 24 * 365;
+    const { data: signed, error: signErr } = await (supabaseAdmin as any)
+      .storage.from(data.bucket).createSignedUrl(data.path, expiresIn);
+    if (signErr) throw new Error(signErr.message);
+    return { ok: true, path: data.path, url: signed?.signedUrl ?? null };
+  });
+
+/** Renvoie une URL signée pour un fichier stocké dans un bucket privé. */
+export const getSignedMediaUrl = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: { bucket: string; path: string; expiresIn?: number }) => {
+    const allowed = ["member-photos", "payment-proofs", "member-cards"];
+    if (!allowed.includes(data?.bucket)) throw new Error("bucket non autorisé");
+    if (!data?.path || typeof data.path !== "string") throw new Error("path requis");
+    return { bucket: data.bucket, path: data.path, expiresIn: Math.min(60 * 60 * 24, Math.max(30, data.expiresIn ?? 600)) };
+  })
+  .handler(async ({ data, context }) => {
+    await assertAnzrboAdmin(context.supabase, context.userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: signed, error } = await (supabaseAdmin as any)
+      .storage.from(data.bucket).createSignedUrl(data.path, data.expiresIn);
+    if (error) throw new Error(error.message);
+    return { url: signed?.signedUrl ?? null };
   });
