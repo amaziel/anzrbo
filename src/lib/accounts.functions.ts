@@ -59,11 +59,21 @@ async function assertSuperAdmin(supabase: any, userId: string) {
  * Autorisé uniquement si AUCUN super_admin n'existe encore (premier lancement),
  * sinon réservé à un super_admin connecté.
  */
-export const seedInitialAccounts = createServerFn({ method: "POST" }).handler(
-  async () => {
+export const seedInitialAccounts = createServerFn({ method: "POST" })
+  .inputValidator((data: { seedToken?: string } = {}) => ({
+    seedToken: typeof data?.seedToken === "string" ? data.seedToken : "",
+  }))
+  .handler(async ({ data }) => {
+    // Gate 1: must provide a server-side shared secret.
+    const expected = process.env.SEED_TOKEN ?? "";
+    if (!expected) throw new Error("Seed désactivé (SEED_TOKEN non configuré côté serveur)");
+    if (!data.seedToken || data.seedToken.length < 8 || data.seedToken !== expected) {
+      throw new Error("Jeton de seed invalide");
+    }
+
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-    // Si un super_admin existe déjà, refuse le seed public.
+    // Gate 2: idempotence — refuse si un super_admin existe déjà.
     const { count } = await (supabaseAdmin as any)
       .from("user_roles")
       .select("user_id", { count: "exact", head: true })
@@ -72,10 +82,21 @@ export const seedInitialAccounts = createServerFn({ method: "POST" }).handler(
       return { ok: false as const, reason: "already_seeded" };
     }
 
+    // Gate 3: lit les mots de passe depuis l'environnement serveur (jamais dans le code).
+    const pwSuper = process.env.SEED_PWD_SUPER_ADMIN ?? "";
+    const pwAnzrbo = process.env.SEED_PWD_ANZRBO ?? "";
+    const pwNsia = process.env.SEED_PWD_NSIA ?? "";
+    if (!pwSuper || !pwAnzrbo || !pwNsia) {
+      throw new Error("Mots de passe seed manquants (SEED_PWD_SUPER_ADMIN / SEED_PWD_ANZRBO / SEED_PWD_NSIA)");
+    }
+    if ([pwSuper, pwAnzrbo, pwNsia].some((p) => p.length < 12)) {
+      throw new Error("Mots de passe seed trop courts (min 12 caractères)");
+    }
+
     const seeds: Array<{ identifiant: string; password: string; role: AccountRole; display: string }> = [
-      { identifiant: "admin",       password: "@DigitOrg",     role: "super_admin",    display: "DigitOrg" },
-      { identifiant: "0759566087",  password: "@Anzrbo2026",   role: "admin_anzrbo",   display: "Admin ANZRBO" },
-      { identifiant: "nsia",        password: "@Nsia123",      role: "nsia",           display: "NSIA" },
+      { identifiant: "admin",       password: pwSuper,  role: "super_admin",    display: "DigitOrg" },
+      { identifiant: "0759566087",  password: pwAnzrbo, role: "admin_anzrbo",   display: "Admin ANZRBO" },
+      { identifiant: "nsia",        password: pwNsia,   role: "nsia",           display: "NSIA" },
     ];
 
 
@@ -116,8 +137,7 @@ export const seedInitialAccounts = createServerFn({ method: "POST" }).handler(
     }
 
     return { ok: true as const, results };
-  },
-);
+  });
 
 /** Liste des comptes (super_admin uniquement). */
 export const listAccounts = createServerFn({ method: "GET" })

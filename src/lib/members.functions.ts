@@ -213,11 +213,30 @@ export const createMember = createServerFn({ method: "POST" })
     return { ok: true, member: m as MemberRow };
   });
 
+const MEMBER_PATCH_FIELDS = [
+  "nom", "prenoms", "telephone", "contact2", "sexe",
+  "date_naissance", "lieu_naissance", "ville", "quartier", "adresse",
+  "photo_url", "cotisation_mensuelle", "notes",
+] as const;
+
 export const updateMember = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((data: { id: string; patch: Partial<MemberInput> }) => {
-    if (!data?.id) throw new Error("id requis");
-    return data;
+    if (!data?.id || typeof data.id !== "string") throw new Error("id requis");
+    if (!data?.patch || typeof data.patch !== "object") throw new Error("patch requis");
+    const safe: Record<string, unknown> = {};
+    for (const k of MEMBER_PATCH_FIELDS) {
+      if (!(k in data.patch)) continue;
+      const v = (data.patch as any)[k];
+      if (v === undefined) continue;
+      if (k === "cotisation_mensuelle") {
+        if (v !== null && typeof v !== "number") throw new Error("cotisation_mensuelle invalide");
+      } else if (v !== null && typeof v !== "string") {
+        throw new Error(`${k} invalide`);
+      }
+      safe[k] = v;
+    }
+    return { id: data.id, patch: safe };
   })
   .handler(async ({ data, context }) => {
     await assertAnzrboAdmin(context.supabase, context.userId);
@@ -312,6 +331,29 @@ export const uploadFile = createServerFn({ method: "POST" })
       .from(data.bucket)
       .upload(data.path, buf, { contentType: data.contentType, upsert: true });
     if (error) throw new Error(error.message);
-    const { data: pub } = (supabaseAdmin as any).storage.from(data.bucket).getPublicUrl(data.path);
-    return { ok: true, path: data.path, url: pub?.publicUrl ?? null };
+    // Buckets are private — return a signed URL. Short-lived for sensitive
+    // documents (justificatifs de paiement), long-lived for affichage carte.
+    const expiresIn = data.bucket === "payment-proofs" ? 60 * 10 : 60 * 60 * 24 * 365;
+    const { data: signed, error: signErr } = await (supabaseAdmin as any)
+      .storage.from(data.bucket).createSignedUrl(data.path, expiresIn);
+    if (signErr) throw new Error(signErr.message);
+    return { ok: true, path: data.path, url: signed?.signedUrl ?? null };
+  });
+
+/** Renvoie une URL signée pour un fichier stocké dans un bucket privé. */
+export const getSignedMediaUrl = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: { bucket: string; path: string; expiresIn?: number }) => {
+    const allowed = ["member-photos", "payment-proofs", "member-cards"];
+    if (!allowed.includes(data?.bucket)) throw new Error("bucket non autorisé");
+    if (!data?.path || typeof data.path !== "string") throw new Error("path requis");
+    return { bucket: data.bucket, path: data.path, expiresIn: Math.min(60 * 60 * 24, Math.max(30, data.expiresIn ?? 600)) };
+  })
+  .handler(async ({ data, context }) => {
+    await assertAnzrboAdmin(context.supabase, context.userId);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: signed, error } = await (supabaseAdmin as any)
+      .storage.from(data.bucket).createSignedUrl(data.path, data.expiresIn);
+    if (error) throw new Error(error.message);
+    return { url: signed?.signedUrl ?? null };
   });
