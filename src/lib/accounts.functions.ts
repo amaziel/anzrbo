@@ -137,8 +137,7 @@ export const seedInitialAccounts = createServerFn({ method: "POST" })
     }
 
     return { ok: true as const, results };
-  },
-);
+  });
 
 /** Liste des comptes (super_admin uniquement). */
 export const listAccounts = createServerFn({ method: "GET" })
