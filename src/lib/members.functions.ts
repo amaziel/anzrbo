@@ -25,7 +25,7 @@ export type MemberRow = {
 };
 
 async function assertAnzrboAdmin(supabase: any, userId: string) {
-  const roles = ["super_admin", "admin_national", "admin_anzrbo"];
+  const roles = ["super_admin", "admin_national", "admin_anzrbo", "agent_saisie"];
   for (const r of roles) {
     try {
       const { data, error } = await supabase.rpc("has_role", { _user_id: userId, _role: r });
