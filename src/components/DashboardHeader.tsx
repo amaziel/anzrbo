@@ -77,6 +77,7 @@ export const ADMIN_NAV: NavItem[] = [
   { to: "/admin/assistances", label: "Assistances" },
   { to: "/admin/nsia", label: "NSIA" },
   { to: "/admin/comptes", label: "Comptes" },
+  { to: "/admin/diagnostic-roles", label: "Diagnostic rôles" },
 ];
 
 

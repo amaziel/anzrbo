@@ -11,8 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Plus, Trash2 } from "lucide-react";
 
 // Étiquettes UI (élargies). Les valeurs `fils`/`fille`/`petit_fils`/`petite_fille`
-// sont des étiquettes d'affichage ; en base elles sont stockées via le mapping
-// `relationToEnum()` ci-dessous tant que l'enum SQL n'a pas été étendu.
+// sont stockées telles quelles dans l'enum SQL actuel.
 export type AyantRelation =
   | "pere"
   | "mere"
@@ -47,10 +46,7 @@ export const RELATION_LABEL: Record<Exclude<AyantRelation, "">, string> = {
   petite_fille: "Petite-fille",
 };
 
-/** Mapping vers l'enum SQL `relation_familiale` actuel. */
 export function relationToEnum(r: AyantRelation): string {
-  if (r === "fils" || r === "fille") return "enfant";
-  if (r === "petit_fils" || r === "petite_fille") return "autre";
   return r || "autre";
 }
 
