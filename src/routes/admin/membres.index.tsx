@@ -101,7 +101,7 @@ function ListeMembres() {
                   <TableRow key={m.id}>
                     <TableCell>
                       {m.photo_url ? (
-                        <img src={m.photo_url} alt="" className="h-9 w-9 rounded-full object-cover" />
+                        <img src={m.photo_url} alt="" className="h-9 w-9 rounded-full object-cover" onLoad={() => console.info('[photo_health][liste]', m.numero_membre, 'ok')} onError={() => console.error('[photo_health][liste]', m.numero_membre, 'photo illisible', m.photo_url)} />
                       ) : <div className="h-9 w-9 rounded-full bg-muted" />}
                     </TableCell>
                     <TableCell className="font-mono text-xs">{m.numero_membre}</TableCell>
@@ -158,15 +158,27 @@ function FicheDialog({ id, onClose }: { id: string | null; onClose: () => void }
   const [type, setType] = useState("cotisation");
   const [justif, setJustif] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
+  const [payError, setPayError] = useState<{ step: string; message: string; raw?: any } | null>(null);
+
+  async function fileToBase64Safe(file: File): Promise<string> {
+    const buf = await file.arrayBuffer();
+    const bytes = new Uint8Array(buf);
+    let bin = "";
+    const chunk = 0x8000;
+    for (let i = 0; i < bytes.length; i += chunk) bin += String.fromCharCode.apply(null, Array.from(bytes.subarray(i, i + chunk)));
+    return btoa(bin);
+  }
 
   async function ajouterPaiement() {
     if (!id) return;
     setBusy(true);
+    setPayError(null);
+    let step = "init";
     try {
       let url: string | null = null;
       if (justif) {
-        const buf = await justif.arrayBuffer();
-        const b64 = btoa(String.fromCharCode(...new Uint8Array(buf)));
+        step = "upload_justificatif";
+        const b64 = await fileToBase64Safe(justif);
         const r = await uploadFn({ data: {
           bucket: "payment-proofs",
           path: `${id}-${Date.now()}-${justif.name}`,
@@ -175,11 +187,17 @@ function FicheDialog({ id, onClose }: { id: string | null; onClose: () => void }
         }});
         url = r.url;
       }
+      step = "create_paiement";
       await addPayFn({ data: { member_id: id, paiement: { type, montant, periode: periode || null, justificatif_url: url, methode: "especes" } } });
       toast.success("Paiement enregistré");
       setJustif(null); setPeriode("");
       qc.invalidateQueries({ queryKey: ["member", id] });
-    } catch (e: any) { toast.error(e?.message ?? "Erreur"); }
+    } catch (e: any) {
+      const message = e?.message ?? String(e) ?? "Erreur inconnue";
+      console.error(`[paiement][${step}]`, e);
+      setPayError({ step, message, raw: e });
+      toast.error(`${step} — ${message}`);
+    }
     finally { setBusy(false); }
   }
 
@@ -236,6 +254,13 @@ function FicheDialog({ id, onClose }: { id: string | null; onClose: () => void }
                 <Button onClick={ajouterPaiement} disabled={busy}>
                   <Receipt className="mr-1 h-4 w-4" /> {busy ? "…" : "Ajouter"}
                 </Button>
+                {payError && (
+                  <div className="col-span-2 rounded-md border border-destructive/40 bg-destructive/5 p-2 text-xs text-destructive md:col-span-5">
+                    <div className="font-semibold">Échec paiement — {payError.step}</div>
+                    <div className="break-words">{payError.message}</div>
+                    <div className="text-muted-foreground">Détails complets dans la console.</div>
+                  </div>
+                )}
               </div>
             </section>
           </div>

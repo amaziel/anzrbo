@@ -41,8 +41,9 @@ function emailForIdentifier(identifiant: string, role: AccountRole): string {
 function dbRoleFor(role: AccountRole): string {
   if (role === "super_admin") return "super_admin";
   if (role === "agent_saisie") return "agent_saisie";
-  // admin_anzrbo & nsia: enum may not contain them yet — use admin_national
-  return "admin_national";
+  if (role === "admin_anzrbo") return "admin_anzrbo";
+  if (role === "nsia") return "nsia";
+  return role;
 }
 
 
