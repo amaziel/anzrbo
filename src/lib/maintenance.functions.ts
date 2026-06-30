@@ -85,10 +85,14 @@ export const purgeDemoData = createServerFn({ method: "POST" })
     return { ok: true, membersRemoved: ids.length, photosRemoved: removedPhotos };
   });
 
-/** Statut du seed (idempotence). */
-export const seedStatus = createServerFn({ method: "GET" }).handler(async () => {
-  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-  const { count } = await (supabaseAdmin as any)
-    .from("user_roles").select("user_id", { count: "exact", head: true }).eq("role", "super_admin");
-  return { seeded: (count ?? 0) > 0, superAdminCount: count ?? 0 };
-});
+/** Statut du seed (super_admin uniquement — évite la divulgation d'état). */
+export const seedStatus = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { data: isSuper } = await (context.supabase as any).rpc("has_role", { _user_id: context.userId, _role: "super_admin" });
+    if (!isSuper) throw new Error("Forbidden — super_admin requis");
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { count } = await (supabaseAdmin as any)
+      .from("user_roles").select("user_id", { count: "exact", head: true }).eq("role", "super_admin");
+    return { seeded: (count ?? 0) > 0, superAdminCount: count ?? 0 };
+  });
