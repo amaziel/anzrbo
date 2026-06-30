@@ -14,12 +14,12 @@ export const Route = createFileRoute("/seed-init")({
 function Page() {
   const seedFn = useServerFn(seedInitialAccounts);
   const [token, setToken] = useState("");
-  const [status, setStatus] = useState<string>(() => localStorage.getItem("anzrbo_seed_status") || "non_executé");
+  const [status, setStatus] = useState<string>(() => typeof window === "undefined" ? "non_executé" : (localStorage.getItem("anzrbo_seed_status") || "non_executé"));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (status === "seed_executé") localStorage.setItem("anzrbo_seed_status", status);
+    if (typeof window !== "undefined" && status === "seed_executé") localStorage.setItem("anzrbo_seed_status", status);
   }, [status]);
 
   async function run(e: React.FormEvent) {
