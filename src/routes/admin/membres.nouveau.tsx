@@ -48,7 +48,7 @@ function NouveauMembre() {
   const nav = useNavigate();
   const createMemberFn = useServerFn(createMember);
   const uploadFileFn = useServerFn(uploadFile);
-  useEffect(() => { if (!loading && (!user || user.role !== "admin_anzrbo")) nav({ to: "/login" }); }, [user, loading, nav]);
+  useEffect(() => { if (!loading && (!user || !user.roles.includes("admin_anzrbo"))) nav({ to: "/login" }); }, [user, loading, nav]);
 
   const [form, setForm] = useState({
     nom: "", prenoms: "", telephone: "", contact2: "",

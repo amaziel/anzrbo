@@ -33,7 +33,7 @@ function StatutBadge({ s }: { s: string }) {
 function ListeMembres() {
   const { user, loading } = useAuth();
   const nav = useNavigate();
-  useEffect(() => { if (!loading && (!user || user.role !== "admin_anzrbo")) nav({ to: "/login" }); }, [user, loading, nav]);
+  useEffect(() => { if (!loading && (!user || !user.roles.includes("admin_anzrbo"))) nav({ to: "/login" }); }, [user, loading, nav]);
 
   const listFn = useServerFn(listMembers);
   const delFn = useServerFn(deleteMember);
