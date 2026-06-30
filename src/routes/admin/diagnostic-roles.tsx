@@ -24,7 +24,7 @@ function Page() {
   useEffect(() => { if (!loading && !user) nav({ to: "/login" }); }, [user, loading, nav]);
   async function refresh() {
     setBusy(true); setError(null);
-    try { const r = await run({ data: {} }); setData(r); console.info("[diagnostic-roles]", r); }
+    try { const r = await run(); setData(r); console.info("[diagnostic-roles]", r); }
     catch (e: any) { console.error("[diagnostic-roles]", e); setError(e?.message ?? String(e)); }
     finally { setBusy(false); }
   }
