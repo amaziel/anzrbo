@@ -7,11 +7,12 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { useAuth, clientRoleGuard } from "@/lib/auth";
 import { listMembers, getMember, deleteMember, addPaiement, uploadFile, type MemberRow } from "@/lib/members.functions";
-import { Search, Users, Eye, Trash2, Receipt, ChevronLeft, ChevronRight } from "lucide-react";
+import { Search, Users, Eye, Trash2, Receipt, ChevronLeft, ChevronRight, Printer, QrCode } from "lucide-react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/admin/membres/")({
@@ -32,20 +33,21 @@ function StatutBadge({ s }: { s: string }) {
 function ListeMembres() {
   const { user, loading } = useAuth();
   const nav = useNavigate();
-  useEffect(() => { if (!loading && (!user || user.role !== "admin_anzrbo")) nav({ to: "/login" }); }, [user, loading, nav]);
+  useEffect(() => { if (!loading && (!user || !user.roles.includes("admin_anzrbo"))) nav({ to: "/login" }); }, [user, loading, nav]);
 
   const listFn = useServerFn(listMembers);
   const delFn = useServerFn(deleteMember);
   const qc = useQueryClient();
 
   const [q, setQ] = useState("");
+  const [statut, setStatut] = useState("tous");
   const [page, setPage] = useState(1);
   const pageSize = 20;
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
   const { data, isLoading } = useQuery({
-    queryKey: ["members", q, page],
-    queryFn: () => listFn({ data: { q, page, pageSize } }),
+    queryKey: ["members", q, statut, page],
+    queryFn: () => listFn({ data: { q, page, pageSize, statut: statut === "tous" ? "" : statut } }),
     enabled: !!user,
   });
 
@@ -77,6 +79,15 @@ function ListeMembres() {
                 <Input className="w-full pl-9 sm:w-80" placeholder="Nom, téléphone, n° membre…"
                   value={q} onChange={(e) => { setQ(e.target.value); setPage(1); }} />
               </div>
+              <Select value={statut} onValueChange={(v) => { setStatut(v); setPage(1); }}>
+                <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="tous">Tous statuts</SelectItem>
+                  <SelectItem value="actif">Actifs</SelectItem>
+                  <SelectItem value="suspendu">Suspendus</SelectItem>
+                  <SelectItem value="decede">Décédés</SelectItem>
+                </SelectContent>
+              </Select>
               <Button asChild><Link to="/admin/membres/nouveau">+ Nouveau membre</Link></Button>
             </div>
           </CardHeader>
@@ -101,7 +112,7 @@ function ListeMembres() {
                   <TableRow key={m.id}>
                     <TableCell>
                       {m.photo_url ? (
-                        <img src={m.photo_url} alt="" className="h-9 w-9 rounded-full object-cover" />
+                        <img src={m.photo_url} alt="" className="h-9 w-9 rounded-full object-cover" onLoad={() => console.info('[photo_health][liste]', m.numero_membre, 'ok')} onError={() => console.error('[photo_health][liste]', m.numero_membre, 'photo illisible', m.photo_url)} />
                       ) : <div className="h-9 w-9 rounded-full bg-muted" />}
                     </TableCell>
                     <TableCell className="font-mono text-xs">{m.numero_membre}</TableCell>
@@ -112,6 +123,8 @@ function ListeMembres() {
                     <TableCell className="text-xs text-muted-foreground">{m.date_inscription ?? "—"}</TableCell>
                     <TableCell className="text-right">
                       <Button size="sm" variant="ghost" onClick={() => setSelectedId(m.id)}><Eye className="h-4 w-4" /></Button>
+                      <Button size="sm" variant="ghost" onClick={() => window.open(`/verifier/${encodeURIComponent(m.numero_membre)}`, "_blank")} title="Aperçu carte / QR"><QrCode className="h-4 w-4" /></Button>
+                      <Button size="sm" variant="ghost" onClick={() => window.open(`/verifier/${encodeURIComponent(m.numero_membre)}?print=1`, "_blank")} title="Imprimer carte"><Printer className="h-4 w-4" /></Button>
                       <Button size="sm" variant="ghost" onClick={() => {
                         if (confirm(`Supprimer ${m.prenoms} ${m.nom} ?`)) delMut.mutate(m.id);
                       }}><Trash2 className="h-4 w-4 text-rose-600" /></Button>
@@ -158,15 +171,27 @@ function FicheDialog({ id, onClose }: { id: string | null; onClose: () => void }
   const [type, setType] = useState("cotisation");
   const [justif, setJustif] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
+  const [payError, setPayError] = useState<{ step: string; message: string; raw?: any } | null>(null);
+
+  async function fileToBase64Safe(file: File): Promise<string> {
+    const buf = await file.arrayBuffer();
+    const bytes = new Uint8Array(buf);
+    let bin = "";
+    const chunk = 0x8000;
+    for (let i = 0; i < bytes.length; i += chunk) bin += String.fromCharCode.apply(null, Array.from(bytes.subarray(i, i + chunk)));
+    return btoa(bin);
+  }
 
   async function ajouterPaiement() {
     if (!id) return;
     setBusy(true);
+    setPayError(null);
+    let step = "init";
     try {
       let url: string | null = null;
       if (justif) {
-        const buf = await justif.arrayBuffer();
-        const b64 = btoa(String.fromCharCode(...new Uint8Array(buf)));
+        step = "upload_justificatif";
+        const b64 = await fileToBase64Safe(justif);
         const r = await uploadFn({ data: {
           bucket: "payment-proofs",
           path: `${id}-${Date.now()}-${justif.name}`,
@@ -175,11 +200,17 @@ function FicheDialog({ id, onClose }: { id: string | null; onClose: () => void }
         }});
         url = r.url;
       }
+      step = "create_paiement";
       await addPayFn({ data: { member_id: id, paiement: { type, montant, periode: periode || null, justificatif_url: url, methode: "especes" } } });
       toast.success("Paiement enregistré");
       setJustif(null); setPeriode("");
       qc.invalidateQueries({ queryKey: ["member", id] });
-    } catch (e: any) { toast.error(e?.message ?? "Erreur"); }
+    } catch (e: any) {
+      const message = e?.message ?? String(e) ?? "Erreur inconnue";
+      console.error(`[paiement][${step}]`, e);
+      setPayError({ step, message, raw: e });
+      toast.error(`${step} — ${message}`);
+    }
     finally { setBusy(false); }
   }
 
@@ -236,6 +267,13 @@ function FicheDialog({ id, onClose }: { id: string | null; onClose: () => void }
                 <Button onClick={ajouterPaiement} disabled={busy}>
                   <Receipt className="mr-1 h-4 w-4" /> {busy ? "…" : "Ajouter"}
                 </Button>
+                {payError && (
+                  <div className="col-span-2 rounded-md border border-destructive/40 bg-destructive/5 p-2 text-xs text-destructive md:col-span-5">
+                    <div className="font-semibold">Échec paiement — {payError.step}</div>
+                    <div className="break-words">{payError.message}</div>
+                    <div className="text-muted-foreground">Détails complets dans la console.</div>
+                  </div>
+                )}
               </div>
             </section>
           </div>

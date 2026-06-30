@@ -23,7 +23,7 @@ export const Route = createFileRoute("/nsia")({
 function NsiaDashboard() {
   const { user, loading } = useAuth();
   const nav = useNavigate();
-  useEffect(() => { if (!loading && (!user || user.role !== "nsia")) nav({ to: "/login" }); }, [user, loading, nav]);
+  useEffect(() => { if (!loading && (!user || !user.roles.includes("nsia"))) nav({ to: "/login" }); }, [user, loading, nav]);
 
   const totalCot = SOUSCRIPTIONS_NSIA.reduce((s, x) => s + x.cotisationAnnuelle, 0);
   const totalVerses = PAIEMENTS_NSIA.reduce((s, x) => s + x.beneficeBrut, 0);

@@ -32,7 +32,7 @@ function fmt(n: number) { return n.toLocaleString("fr-FR") + " F"; }
 function AdminDashboard() {
   const { user, loading } = useAuth();
   const nav = useNavigate();
-  useEffect(() => { if (!loading && (!user || user.role !== "admin_anzrbo")) nav({ to: "/login" }); }, [user, loading, nav]);
+  useEffect(() => { if (!loading && (!user || !user.roles.includes("admin_anzrbo"))) nav({ to: "/login" }); }, [user, loading, nav]);
 
   const s = useMemo(() => statsAnzrbo(), []);
   const repartition = useMemo(() => [

@@ -20,7 +20,7 @@ export const Route = createFileRoute("/digitorg")({
 function DigitOrgDashboard() {
   const { user, loading } = useAuth();
   const nav = useNavigate();
-  useEffect(() => { if (!loading && (!user || user.role !== "digitorg")) nav({ to: "/login" }); }, [user, loading, nav]);
+  useEffect(() => { if (!loading && (!user || !user.roles.includes("digitorg"))) nav({ to: "/login" }); }, [user, loading, nav]);
   const s = useMemo(() => statsAnzrbo(), []);
 
   const trend = useMemo(() => {
