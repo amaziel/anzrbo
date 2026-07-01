@@ -28,6 +28,26 @@ export type MemberRow = {
 
 async function assertAnzrboAdmin(supabase: any, userId: string) {
   const roles = ["super_admin", "admin_national", "admin_anzrbo", "agent_saisie"];
+  try {
+    const { data, error } = await supabase
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", userId)
+      .in("role", roles);
+    if (!error && (data?.length ?? 0) > 0) return;
+  } catch { /* fallback below */ }
+
+  try {
+    const db = await getTrustedDbClient({ supabase });
+    const { data, error } = await db
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", userId)
+      .in("role", roles);
+    if (!error && (data?.length ?? 0) > 0) return;
+  } catch { /* no-op */ }
+
+  // Compatibilité avec anciennes bases où la fonction est encore exécutable.
   for (const r of roles) {
     try {
       const { data, error } = await supabase.rpc("has_role", { _user_id: userId, _role: r });
