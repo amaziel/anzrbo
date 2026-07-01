@@ -31,6 +31,7 @@ import { Route as AdminNsiaIndexRouteImport } from './routes/admin/nsia.index'
 import { Route as AdminMembresIndexRouteImport } from './routes/admin/membres.index'
 import { Route as AdminNsiaNouveauRouteImport } from './routes/admin/nsia.nouveau'
 import { Route as AdminMembresNouveauRouteImport } from './routes/admin/membres.nouveau'
+import { Route as AdminMembresIdModifierRouteImport } from './routes/admin/membres.$id.modifier'
 
 const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
   id: '/sitemap.xml',
@@ -142,6 +143,11 @@ const AdminMembresNouveauRoute = AdminMembresNouveauRouteImport.update({
   path: '/admin/membres/nouveau',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminMembresIdModifierRoute = AdminMembresIdModifierRouteImport.update({
+  id: '/admin/membres/$id/modifier',
+  path: '/admin/membres/$id/modifier',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -166,6 +172,7 @@ export interface FileRoutesByFullPath {
   '/admin/nsia/nouveau': typeof AdminNsiaNouveauRoute
   '/admin/membres/': typeof AdminMembresIndexRoute
   '/admin/nsia/': typeof AdminNsiaIndexRoute
+  '/admin/membres/$id/modifier': typeof AdminMembresIdModifierRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -189,6 +196,7 @@ export interface FileRoutesByTo {
   '/admin/nsia/nouveau': typeof AdminNsiaNouveauRoute
   '/admin/membres': typeof AdminMembresIndexRoute
   '/admin/nsia': typeof AdminNsiaIndexRoute
+  '/admin/membres/$id/modifier': typeof AdminMembresIdModifierRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -214,6 +222,7 @@ export interface FileRoutesById {
   '/admin/nsia/nouveau': typeof AdminNsiaNouveauRoute
   '/admin/membres/': typeof AdminMembresIndexRoute
   '/admin/nsia/': typeof AdminNsiaIndexRoute
+  '/admin/membres/$id/modifier': typeof AdminMembresIdModifierRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -240,6 +249,7 @@ export interface FileRouteTypes {
     | '/admin/nsia/nouveau'
     | '/admin/membres/'
     | '/admin/nsia/'
+    | '/admin/membres/$id/modifier'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -263,6 +273,7 @@ export interface FileRouteTypes {
     | '/admin/nsia/nouveau'
     | '/admin/membres'
     | '/admin/nsia'
+    | '/admin/membres/$id/modifier'
   id:
     | '__root__'
     | '/'
@@ -287,6 +298,7 @@ export interface FileRouteTypes {
     | '/admin/nsia/nouveau'
     | '/admin/membres/'
     | '/admin/nsia/'
+    | '/admin/membres/$id/modifier'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -310,6 +322,7 @@ export interface RootRouteChildren {
   AdminIndexRoute: typeof AdminIndexRoute
   AdminMembresNouveauRoute: typeof AdminMembresNouveauRoute
   AdminMembresIndexRoute: typeof AdminMembresIndexRoute
+  AdminMembresIdModifierRoute: typeof AdminMembresIdModifierRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -468,6 +481,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminMembresNouveauRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin/membres/$id/modifier': {
+      id: '/admin/membres/$id/modifier'
+      path: '/admin/membres/$id/modifier'
+      fullPath: '/admin/membres/$id/modifier'
+      preLoaderRoute: typeof AdminMembresIdModifierRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -506,6 +526,7 @@ const rootRouteChildren: RootRouteChildren = {
   AdminIndexRoute: AdminIndexRoute,
   AdminMembresNouveauRoute: AdminMembresNouveauRoute,
   AdminMembresIndexRoute: AdminMembresIndexRoute,
+  AdminMembresIdModifierRoute: AdminMembresIdModifierRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

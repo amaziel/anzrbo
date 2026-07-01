@@ -32,6 +32,12 @@ function Page() {
     setLoading(true);
     verifyFn({ data: { q: raw } }).then((r) => setRow(r.member)).catch(() => setRow(null)).finally(() => setLoading(false));
   }, [raw]);
+  useEffect(() => {
+    if (!loading && row && typeof window !== "undefined" && new URLSearchParams(window.location.search).get("print") === "1") {
+      const t = window.setTimeout(() => window.print(), 700);
+      return () => window.clearTimeout(t);
+    }
+  }, [loading, row]);
   const m = row ? {
     id: row.id,
     numeroMembre: row.numero_membre,
@@ -53,9 +59,10 @@ function Page() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-[#f7f3e9] via-white to-[#eaf2ec]">
+      <style>{`@page{size:85.6mm 53.98mm;margin:0}@media print{body{background:white!important}.site-header,.site-footer,header,footer,.no-print{display:none!important}.card-anzrbo{box-shadow:none!important;break-after:page;page-break-after:always}.card-anzrbo:last-child{break-after:auto;page-break-after:auto}}`}</style>
       <SiteHeader />
       <section className="container mx-auto max-w-5xl px-4 py-10">
-        <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+        <div className="no-print mb-6 flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-2 text-[#0c5b2e]">
             <ShieldCheck className="h-5 w-5" />
             <span className="text-xs font-semibold uppercase tracking-widest">Fiche publique vérifiée</span>
