@@ -48,6 +48,25 @@ function dbRoleFor(role: AccountRole): string {
 
 
 async function assertSuperAdmin(supabase: any, userId: string) {
+  try {
+    const { data, error } = await supabase
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", userId)
+      .eq("role", "super_admin");
+    if (!error && (data?.length ?? 0) > 0) return;
+  } catch { /* fallback below */ }
+
+  try {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data, error } = await (supabaseAdmin as any)
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", userId)
+      .eq("role", "super_admin");
+    if (!error && (data?.length ?? 0) > 0) return;
+  } catch { /* fallback below */ }
+
   const { data, error } = await supabase.rpc("has_role", {
     _user_id: userId,
     _role: "super_admin",
