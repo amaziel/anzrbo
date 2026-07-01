@@ -12,7 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { useAuth, clientRoleGuard } from "@/lib/auth";
 import { listMembers, getMember, deleteMember, addPaiement, uploadFile, type MemberRow } from "@/lib/members.functions";
-import { Search, Users, Eye, Trash2, Receipt, ChevronLeft, ChevronRight, Printer, QrCode } from "lucide-react";
+import { Search, Users, Eye, Trash2, Receipt, ChevronLeft, ChevronRight, Printer, QrCode, Pencil } from "lucide-react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/admin/membres/")({
@@ -123,6 +123,7 @@ function ListeMembres() {
                     <TableCell className="text-xs text-muted-foreground">{m.date_inscription ?? "—"}</TableCell>
                     <TableCell className="text-right">
                       <Button size="sm" variant="ghost" onClick={() => setSelectedId(m.id)}><Eye className="h-4 w-4" /></Button>
+                      <Button size="sm" variant="ghost" asChild title="Modifier le membre"><Link to="/admin/membres/$id/modifier" params={{ id: m.id }}><Pencil className="h-4 w-4" /></Link></Button>
                       <Button size="sm" variant="ghost" onClick={() => window.open(`/verifier/${encodeURIComponent(m.numero_membre)}`, "_blank")} title="Aperçu carte / QR"><QrCode className="h-4 w-4" /></Button>
                       <Button size="sm" variant="ghost" onClick={() => window.open(`/verifier/${encodeURIComponent(m.numero_membre)}?print=1`, "_blank")} title="Imprimer carte"><Printer className="h-4 w-4" /></Button>
                       <Button size="sm" variant="ghost" onClick={() => {
