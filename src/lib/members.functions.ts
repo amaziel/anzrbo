@@ -1,5 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { createClient } from "@supabase/supabase-js";
+import type { Database } from "@/integrations/supabase/types";
 
 export type MemberRow = {
   id: string;
@@ -35,6 +37,31 @@ async function assertAnzrboAdmin(supabase: any, userId: string) {
   throw new Error("Forbidden");
 }
 
+const SUPABASE_URL_FALLBACK = "https://ogseybvemtoxqpgpxewg.supabase.co";
+const SUPABASE_PUBLISHABLE_KEY_FALLBACK = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9nc2V5YnZlbXRveHFwZ3B4ZXdnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIzNzYyNDcsImV4cCI6MjA5Nzk1MjI0N30.16aClFbUFKk-VH2_CHY7P6kX3rU3IZ6uGEzK_LsNe54";
+
+async function getTrustedDbClient(context: any) {
+  try {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    // Initialise the lazy proxy here; if SERVICE_ROLE_KEY is absent, the catch
+    // below falls back to the authenticated Supabase client instead of failing
+    // later during member creation/upload.
+    void (supabaseAdmin as any).from;
+    return supabaseAdmin as any;
+  } catch (error) {
+    console.warn("[members.functions] admin client indisponible, bascule sur client authentifié RLS", error);
+    return context.supabase as any;
+  }
+}
+
+function createPublicSupabaseClient() {
+  const url = process.env.SUPABASE_URL ?? process.env.VITE_SUPABASE_URL ?? process.env.PROJECT_SUPABASE_URL ?? SUPABASE_URL_FALLBACK;
+  const key = process.env.SUPABASE_PUBLISHABLE_KEY ?? process.env.VITE_SUPABASE_PUBLISHABLE_KEY ?? process.env.VITE_SUPABASE_ANON_KEY ?? SUPABASE_PUBLISHABLE_KEY_FALLBACK;
+  return createClient<Database>(url, key, {
+    auth: { storage: undefined, persistSession: false, autoRefreshToken: false },
+  }) as any;
+}
+
 
 function genNumero() {
   const y = new Date().getFullYear();
@@ -53,10 +80,10 @@ export const listMembers = createServerFn({ method: "POST" })
   }))
   .handler(async ({ data, context }) => {
     await assertAnzrboAdmin(context.supabase, context.userId);
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const db = await getTrustedDbClient(context);
     const from = (data.page - 1) * data.pageSize;
     const to = from + data.pageSize - 1;
-    let q = (supabaseAdmin as any)
+    let q = db
       .from("members")
       .select("*", { count: "exact" })
       .order("created_at", { ascending: false })
@@ -81,12 +108,12 @@ export const getMember = createServerFn({ method: "POST" })
   })
   .handler(async ({ data, context }) => {
     await assertAnzrboAdmin(context.supabase, context.userId);
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const db = await getTrustedDbClient(context);
     const [{ data: member, error: e1 }, { data: ayants }, { data: paiements }, { data: cards }] = await Promise.all([
-      (supabaseAdmin as any).from("members").select("*").eq("id", data.id).maybeSingle(),
-      (supabaseAdmin as any).from("ayants_droit").select("*").eq("member_id", data.id).order("created_at"),
-      (supabaseAdmin as any).from("paiements").select("*").eq("member_id", data.id).order("created_at", { ascending: false }),
-      (supabaseAdmin as any).from("member_cards").select("*").eq("member_id", data.id).order("version", { ascending: false }),
+      db.from("members").select("*").eq("id", data.id).maybeSingle(),
+      db.from("ayants_droit").select("*").eq("member_id", data.id).order("created_at"),
+      db.from("paiements").select("*").eq("member_id", data.id).order("created_at", { ascending: false }),
+      db.from("member_cards").select("*").eq("member_id", data.id).order("version", { ascending: false }),
     ]);
     if (e1) throw new Error(e1.message);
     if (!member) throw new Error("Membre introuvable");
@@ -120,8 +147,33 @@ function normalizePaiementType(type?: string | null): "cotisation" | "nsia" | "a
 }
 
 function detailedSupabaseError(scope: string, error: any) {
-  const parts = [scope, error?.code, error?.message, error?.details, error?.hint].filter(Boolean);
+  const parts = [scope, error?.statusCode, error?.code, error?.message, error?.details, error?.hint].filter(Boolean);
   return new Error(parts.join(" — "));
+}
+
+function publicStorageUrl(bucket: string, path: string) {
+  const base = (process.env.SUPABASE_URL ?? process.env.VITE_SUPABASE_URL ?? process.env.PROJECT_SUPABASE_URL ?? SUPABASE_URL_FALLBACK).replace(/\/$/, "");
+  return `${base}/storage/v1/object/public/${encodeURIComponent(bucket)}/${path.split("/").map(encodeURIComponent).join("/")}`;
+}
+
+async function regenerateMemberCard(db: any, memberId: string, numeroMembre: string, userId: string) {
+  const { data: latest } = await db
+    .from("member_cards")
+    .select("version")
+    .eq("member_id", memberId)
+    .order("version", { ascending: false })
+    .limit(1);
+  const version = ((latest?.[0]?.version as number | undefined) ?? 0) + 1;
+  await db.from("member_cards").update({ active: false }).eq("member_id", memberId);
+  const qrPayload = `${process.env.PUBLIC_SITE_URL ?? "https://anzrbo1.lovable.app"}/verifier/${encodeURIComponent(numeroMembre)}`;
+  const { error } = await db.from("member_cards").insert({
+    member_id: memberId,
+    version,
+    qr_payload: qrPayload,
+    active: true,
+    created_by: userId,
+  });
+  if (error) console.warn("[member_cards][regenerate]", error.message);
 }
 
 export type MemberInput = {
@@ -153,10 +205,10 @@ export const createMember = createServerFn({ method: "POST" })
   })
   .handler(async ({ data, context }) => {
     await assertAnzrboAdmin(context.supabase, context.userId);
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const db = await getTrustedDbClient(context);
 
     const numero = genNumero();
-    const { data: m, error } = await (supabaseAdmin as any)
+    const { data: m, error } = await db
       .from("members")
       .insert({
         numero_membre: numero,
@@ -195,14 +247,14 @@ export const createMember = createServerFn({ method: "POST" })
           beneficiaire_assistance: false,
         }));
       if (rows.length) {
-        const { error: e2 } = await (supabaseAdmin as any).from("ayants_droit").insert(rows);
+        const { error: e2 } = await db.from("ayants_droit").insert(rows);
           if (e2) throw detailedSupabaseError("Ayants droit", e2);
       }
     }
 
     if (data.paiement_inscription) {
       const p = data.paiement_inscription;
-      const { error: e3 } = await (supabaseAdmin as any).from("paiements").insert({
+      const { error: e3 } = await db.from("paiements").insert({
         member_id: m.id,
         type: normalizePaiementType(p.type),
         montant: p.montant ?? 1500,
@@ -219,14 +271,14 @@ export const createMember = createServerFn({ method: "POST" })
 
     // La base génère déjà la carte active via trigger. Si le trigger est absent,
     // on crée une carte de secours sans casser l'inscription.
-    const { count: cardCount } = await (supabaseAdmin as any)
+    const { count: cardCount } = await db
       .from("member_cards")
       .select("id", { count: "exact", head: true })
       .eq("member_id", m.id)
       .eq("active", true);
     if ((cardCount ?? 0) === 0) {
       const qrPayload = `${process.env.PUBLIC_SITE_URL ?? "https://anzrbo1.lovable.app"}/verifier/${encodeURIComponent(numero)}`;
-      const { error: cardError } = await (supabaseAdmin as any).from("member_cards").insert({
+      const { error: cardError } = await db.from("member_cards").insert({
         member_id: m.id, version: 1, qr_payload: qrPayload, active: true, created_by: context.userId,
       });
       if (cardError) console.warn("[createMember][member_cards]", cardError.message);
@@ -238,12 +290,12 @@ export const createMember = createServerFn({ method: "POST" })
 const MEMBER_PATCH_FIELDS = [
   "nom", "prenoms", "telephone", "contact2", "sexe",
   "date_naissance", "lieu_naissance", "ville", "quartier", "adresse",
-  "photo_url", "cotisation_mensuelle", "notes",
+  "photo_url", "cotisation_mensuelle", "notes", "statut",
 ] as const;
 
 export const updateMember = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((data: { id: string; patch: Partial<MemberInput> }) => {
+  .inputValidator((data: { id: string; patch: Record<string, unknown> }) => {
     if (!data?.id || typeof data.id !== "string") throw new Error("id requis");
     if (!data?.patch || typeof data.patch !== "object") throw new Error("patch requis");
     const safe: Record<string, unknown> = {};
@@ -253,6 +305,8 @@ export const updateMember = createServerFn({ method: "POST" })
       if (v === undefined) continue;
       if (k === "cotisation_mensuelle") {
         if (v !== null && typeof v !== "number") throw new Error("cotisation_mensuelle invalide");
+      } else if (k === "statut") {
+        if (typeof v !== "string" || !["actif", "suspendu", "decede"].includes(v)) throw new Error("statut invalide");
       } else if (v !== null && typeof v !== "string") {
         throw new Error(`${k} invalide`);
       }
@@ -262,12 +316,14 @@ export const updateMember = createServerFn({ method: "POST" })
   })
   .handler(async ({ data, context }) => {
     await assertAnzrboAdmin(context.supabase, context.userId);
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { error } = await (supabaseAdmin as any).from("members").update({
+    const db = await getTrustedDbClient(context);
+    const { error } = await db.from("members").update({
       ...data.patch,
       updated_at: new Date().toISOString(),
     }).eq("id", data.id);
     if (error) throw detailedSupabaseError("Modification membre", error);
+    const { data: m, error: readError } = await db.from("members").select("id,numero_membre").eq("id", data.id).maybeSingle();
+    if (!readError && m?.numero_membre) await regenerateMemberCard(db, data.id, m.numero_membre, context.userId);
     return { ok: true };
   });
 
@@ -279,8 +335,8 @@ export const deleteMember = createServerFn({ method: "POST" })
   })
   .handler(async ({ data, context }) => {
     await assertAnzrboAdmin(context.supabase, context.userId);
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { error } = await (supabaseAdmin as any).from("members").delete().eq("id", data.id);
+    const db = await getTrustedDbClient(context);
+    const { error } = await db.from("members").delete().eq("id", data.id);
     if (error) throw detailedSupabaseError("Suppression membre", error);
     return { ok: true };
   });
@@ -295,8 +351,8 @@ export const addPaiement = createServerFn({ method: "POST" })
   })
   .handler(async ({ data, context }) => {
     await assertAnzrboAdmin(context.supabase, context.userId);
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data: row, error } = await (supabaseAdmin as any).from("paiements").insert({
+    const db = await getTrustedDbClient(context);
+    const { data: row, error } = await db.from("paiements").insert({
       member_id: data.member_id,
       type: normalizePaiementType(data.paiement.type),
       montant: data.paiement.montant,
@@ -319,7 +375,16 @@ export const verifyMemberPublic = createServerFn({ method: "POST" })
     return { q: data.q.trim() };
   })
   .handler(async ({ data }) => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    let db: any;
+    try {
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      // Force lazy proxy initialization here so missing env vars are caught.
+      void (supabaseAdmin as any).from;
+      db = supabaseAdmin as any;
+    } catch (error) {
+      console.warn("[verifyMemberPublic] admin client indisponible, bascule lecture publique", error);
+      db = createPublicSupabaseClient();
+    }
     let raw = data.q;
     try {
       const parsed = JSON.parse(raw);
@@ -328,7 +393,7 @@ export const verifyMemberPublic = createServerFn({ method: "POST" })
     const match = raw.match(/(?:\/m\/|\/verifier\/)([^/?#]+)/i);
     if (match) raw = decodeURIComponent(match[1]);
     const digits = raw.replace(/\D/g, "");
-    let query = (supabaseAdmin as any)
+    let query = db
       .from("members")
       .select("id,numero_membre,photo_url,nom,prenoms,telephone,contact2,ville,quartier,adresse,date_naissance,lieu_naissance,date_inscription,statut")
       .limit(1);
@@ -353,18 +418,39 @@ export const uploadFile = createServerFn({ method: "POST" })
   })
   .handler(async ({ data, context }) => {
     await assertAnzrboAdmin(context.supabase, context.userId);
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const buf = Buffer.from(data.base64, "base64");
-    const { error } = await (supabaseAdmin as any).storage
-      .from(data.bucket)
-      .upload(data.path, buf, { contentType: data.contentType, upsert: true });
-    if (error) throw new Error(error.message);
+
+    const storageClients: Array<{ name: string; storage: any }> = [];
+    try {
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      storageClients.push({ name: "service_role", storage: (supabaseAdmin as any).storage.from(data.bucket) });
+    } catch (error) {
+      console.warn(`[uploadFile][${data.bucket}] service_role indisponible`, error);
+    }
+    storageClients.push({ name: "authenticated_rls", storage: (context.supabase as any).storage.from(data.bucket) });
+
+    let uploadError: any = null;
+    let usedStorage: any = null;
+    for (const candidate of storageClients) {
+      const { error } = await candidate.storage.upload(data.path, buf, { contentType: data.contentType, upsert: true });
+      if (!error) {
+        usedStorage = candidate.storage;
+        uploadError = null;
+        break;
+      }
+      uploadError = { ...error, client: candidate.name };
+      console.error(`[uploadFile][${candidate.name}][${data.bucket}]`, error);
+    }
+    if (uploadError || !usedStorage) throw detailedSupabaseError(`Upload ${data.bucket}`, uploadError);
+
     // Buckets are private — return a signed URL. Short-lived for sensitive
     // documents (justificatifs de paiement), long-lived for affichage carte.
     const expiresIn = data.bucket === "payment-proofs" ? 60 * 10 : 60 * 60 * 24 * 365;
-    const { data: signed, error: signErr } = await (supabaseAdmin as any)
-      .storage.from(data.bucket).createSignedUrl(data.path, expiresIn);
-    if (signErr) throw new Error(signErr.message);
+    const { data: signed, error: signErr } = await usedStorage.createSignedUrl(data.path, expiresIn);
+    if (signErr) {
+      console.warn(`[uploadFile][signed_url][${data.bucket}]`, signErr);
+      return { ok: true, path: data.path, url: publicStorageUrl(data.bucket, data.path), signedUrlError: signErr.message };
+    }
     return { ok: true, path: data.path, url: signed?.signedUrl ?? null };
   });
 
@@ -379,9 +465,21 @@ export const getSignedMediaUrl = createServerFn({ method: "POST" })
   })
   .handler(async ({ data, context }) => {
     await assertAnzrboAdmin(context.supabase, context.userId);
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data: signed, error } = await (supabaseAdmin as any)
-      .storage.from(data.bucket).createSignedUrl(data.path, data.expiresIn);
-    if (error) throw new Error(error.message);
-    return { url: signed?.signedUrl ?? null };
+    const storageClients: any[] = [];
+    try {
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      storageClients.push((supabaseAdmin as any).storage.from(data.bucket));
+    } catch (error) {
+      console.warn(`[getSignedMediaUrl][${data.bucket}] service_role indisponible`, error);
+    }
+    storageClients.push((context.supabase as any).storage.from(data.bucket));
+
+    let lastError: any = null;
+    for (const storage of storageClients) {
+      const { data: signed, error } = await storage.createSignedUrl(data.path, data.expiresIn);
+      if (!error) return { url: signed?.signedUrl ?? null };
+      lastError = error;
+    }
+    if (lastError) throw detailedSupabaseError(`URL média ${data.bucket}`, lastError);
+    return { url: publicStorageUrl(data.bucket, data.path) };
   });
