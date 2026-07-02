@@ -29,15 +29,6 @@ export type MemberRow = {
 async function assertAnzrboAdmin(supabase: any, userId: string) {
   const roles = ["super_admin", "admin_national", "admin_anzrbo", "agent_saisie"];
   try {
-    const { data, error } = await supabase
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", userId)
-      .in("role", roles);
-    if (!error && (data?.length ?? 0) > 0) return;
-  } catch { /* fallback below */ }
-
-  try {
     const db = await getTrustedDbClient({ supabase });
     const { data, error } = await db
       .from("user_roles")
@@ -45,7 +36,7 @@ async function assertAnzrboAdmin(supabase: any, userId: string) {
       .eq("user_id", userId)
       .in("role", roles);
     if (!error && (data?.length ?? 0) > 0) return;
-  } catch { /* no-op */ }
+  } catch { /* fallback below */ }
 
   // Compatibilité avec anciennes bases où la fonction est encore exécutable.
   for (const r of roles) {
@@ -59,17 +50,27 @@ async function assertAnzrboAdmin(supabase: any, userId: string) {
 
 const SUPABASE_URL_FALLBACK = "https://ogseybvemtoxqpgpxewg.supabase.co";
 const SUPABASE_PUBLISHABLE_KEY_FALLBACK = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9nc2V5YnZlbXRveHFwZ3B4ZXdnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIzNzYyNDcsImV4cCI6MjA5Nzk1MjI0N30.16aClFbUFKk-VH2_CHY7P6kX3rU3IZ6uGEzK_LsNe54";
+const INLINE_UPLOAD_MAX_BYTES = 900_000;
+
+let cachedAdminClient: any | null | undefined;
+let loggedAdminClientWarning = false;
 
 async function getTrustedDbClient(context: any) {
+  if (cachedAdminClient !== undefined) return cachedAdminClient ?? (context.supabase as any);
   try {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     // Initialise the lazy proxy here; if SERVICE_ROLE_KEY is absent, the catch
     // below falls back to the authenticated Supabase client instead of failing
     // later during member creation/upload.
     void (supabaseAdmin as any).from;
-    return supabaseAdmin as any;
+    cachedAdminClient = supabaseAdmin as any;
+    return cachedAdminClient;
   } catch (error) {
-    console.warn("[members.functions] admin client indisponible, bascule sur client authentifié RLS", error);
+    cachedAdminClient = null;
+    if (!loggedAdminClientWarning) {
+      console.warn("[members.functions] admin client indisponible, bascule sur client authentifié RLS", error);
+      loggedAdminClientWarning = true;
+    }
     return context.supabase as any;
   }
 }
@@ -176,6 +177,16 @@ function publicStorageUrl(bucket: string, path: string) {
   return `${base}/storage/v1/object/public/${encodeURIComponent(bucket)}/${path.split("/").map(encodeURIComponent).join("/")}`;
 }
 
+function inlineDataUrl(contentType: string, base64: string) {
+  return `data:${contentType || "application/octet-stream"};base64,${base64}`;
+}
+
+function canUseInlineFallback(bucket: string, contentType: string, bytes: number) {
+  return ["member-photos", "payment-proofs"].includes(bucket)
+    && bytes <= INLINE_UPLOAD_MAX_BYTES
+    && (contentType.startsWith("image/") || contentType === "application/pdf");
+}
+
 async function regenerateMemberCard(db: any, memberId: string, numeroMembre: string, userId: string) {
   const { data: latest } = await db
     .from("member_cards")
@@ -253,6 +264,8 @@ export const createMember = createServerFn({ method: "POST" })
       .single();
     if (error) throw detailedSupabaseError("Membre", error);
 
+    const postCreateTasks: Promise<void>[] = [];
+
     if (data.ayants?.length) {
       const rows = data.ayants
         .filter((a) => a.nom && a.relation)
@@ -267,14 +280,15 @@ export const createMember = createServerFn({ method: "POST" })
           beneficiaire_assistance: false,
         }));
       if (rows.length) {
-        const { error: e2 } = await db.from("ayants_droit").insert(rows);
+        postCreateTasks.push(db.from("ayants_droit").insert(rows).then(({ error: e2 }: any) => {
           if (e2) throw detailedSupabaseError("Ayants droit", e2);
+        }));
       }
     }
 
     if (data.paiement_inscription) {
       const p = data.paiement_inscription;
-      const { error: e3 } = await db.from("paiements").insert({
+      postCreateTasks.push(db.from("paiements").insert({
         member_id: m.id,
         type: normalizePaiementType(p.type),
         montant: p.montant ?? 1500,
@@ -285,24 +299,29 @@ export const createMember = createServerFn({ method: "POST" })
         paye_le: new Date().toISOString(),
         encaisse_par: context.userId,
         notes: p.type && normalizePaiementType(p.type) !== p.type ? `Type UI: ${p.type}` : null,
-      });
+      }).then(({ error: e3 }: any) => {
       if (e3) throw detailedSupabaseError("Paiement inscription", e3);
+      }));
     }
 
     // La base génère déjà la carte active via trigger. Si le trigger est absent,
     // on crée une carte de secours sans casser l'inscription.
-    const { count: cardCount } = await db
+    postCreateTasks.push(db
       .from("member_cards")
       .select("id", { count: "exact", head: true })
       .eq("member_id", m.id)
-      .eq("active", true);
-    if ((cardCount ?? 0) === 0) {
-      const qrPayload = `${process.env.PUBLIC_SITE_URL ?? "https://anzrbo1.lovable.app"}/verifier/${encodeURIComponent(numero)}`;
-      const { error: cardError } = await db.from("member_cards").insert({
-        member_id: m.id, version: 1, qr_payload: qrPayload, active: true, created_by: context.userId,
-      });
-      if (cardError) console.warn("[createMember][member_cards]", cardError.message);
-    }
+      .eq("active", true)
+      .then(async ({ count: cardCount }: any) => {
+        if ((cardCount ?? 0) === 0) {
+          const qrPayload = `${process.env.PUBLIC_SITE_URL ?? "https://anzrbo1.lovable.app"}/verifier/${encodeURIComponent(numero)}`;
+          const { error: cardError } = await db.from("member_cards").insert({
+            member_id: m.id, version: 1, qr_payload: qrPayload, active: true, created_by: context.userId,
+          });
+          if (cardError) console.warn("[createMember][member_cards]", cardError.message);
+        }
+      }));
+
+    await Promise.all(postCreateTasks);
 
     return { ok: true, member: m as MemberRow };
   });
@@ -342,8 +361,6 @@ export const updateMember = createServerFn({ method: "POST" })
       updated_at: new Date().toISOString(),
     }).eq("id", data.id);
     if (error) throw detailedSupabaseError("Modification membre", error);
-    const { data: m, error: readError } = await db.from("members").select("id,numero_membre").eq("id", data.id).maybeSingle();
-    if (!readError && m?.numero_membre) await regenerateMemberCard(db, data.id, m.numero_membre, context.userId);
     return { ok: true };
   });
 
@@ -452,7 +469,11 @@ export const uploadFile = createServerFn({ method: "POST" })
     let uploadError: any = null;
     let usedStorage: any = null;
     for (const candidate of storageClients) {
-      const { error } = await candidate.storage.upload(data.path, buf, { contentType: data.contentType, upsert: true });
+      const { error } = await candidate.storage.upload(data.path, buf, {
+        contentType: data.contentType,
+        upsert: true,
+        cacheControl: "31536000",
+      });
       if (!error) {
         usedStorage = candidate.storage;
         uploadError = null;
@@ -461,7 +482,13 @@ export const uploadFile = createServerFn({ method: "POST" })
       uploadError = { ...error, client: candidate.name };
       console.error(`[uploadFile][${candidate.name}][${data.bucket}]`, error);
     }
-    if (uploadError || !usedStorage) throw detailedSupabaseError(`Upload ${data.bucket}`, uploadError);
+    if (uploadError || !usedStorage) {
+      if (canUseInlineFallback(data.bucket, data.contentType, buf.byteLength)) {
+        console.warn(`[uploadFile][${data.bucket}] fallback inline après refus Storage`, uploadError);
+        return { ok: true, path: data.path, url: inlineDataUrl(data.contentType, data.base64), inline: true, storageError: uploadError?.message ?? "Storage refusé" };
+      }
+      throw detailedSupabaseError(`Upload ${data.bucket}`, uploadError);
+    }
 
     // Buckets are private — return a signed URL. Short-lived for sensitive
     // documents (justificatifs de paiement), long-lived for affichage carte.
@@ -469,6 +496,9 @@ export const uploadFile = createServerFn({ method: "POST" })
     const { data: signed, error: signErr } = await usedStorage.createSignedUrl(data.path, expiresIn);
     if (signErr) {
       console.warn(`[uploadFile][signed_url][${data.bucket}]`, signErr);
+      if (canUseInlineFallback(data.bucket, data.contentType, buf.byteLength)) {
+        return { ok: true, path: data.path, url: inlineDataUrl(data.contentType, data.base64), inline: true, signedUrlError: signErr.message };
+      }
       return { ok: true, path: data.path, url: publicStorageUrl(data.bucket, data.path), signedUrlError: signErr.message };
     }
     return { ok: true, path: data.path, url: signed?.signedUrl ?? null };
