@@ -28,7 +28,7 @@ async function fileToBase64(file: File): Promise<string> {
   return btoa(bin);
 }
 
-async function compressImage(file: File, maxDim = 1280, quality = 0.82): Promise<Blob> {
+async function compressImage(file: File, maxDim = 760, quality = 0.72): Promise<Blob> {
   if (!file.type.startsWith("image/")) return file;
   const bmp = await createImageBitmap(file).catch(() => null);
   if (!bmp) return file;
@@ -98,7 +98,7 @@ function ModifierMembre() {
       let photoUrl = form.photo_url;
       if (photo) {
         step = "upload_photo";
-        const blob = await compressImage(photo, 1024, 0.8);
+        const blob = await compressImage(photo, 760, 0.72);
         const f = new File([blob], `photo-${Date.now()}.jpg`, { type: "image/jpeg" });
         const b64 = await fileToBase64(f);
         const path = `${member.id}/${Date.now()}-${form.telephone.replace(/\D/g, "")}.jpg`;
@@ -116,13 +116,13 @@ function ModifierMembre() {
           contact_urgence: { nom: form.urgenceNom || null, contact1: form.urgenceContact1 || null, contact2: form.urgenceContact2 || null, adresse: form.urgenceAdresse || null },
         }),
       } } });
-      step = "photo_health";
-      if (photoUrl) await new Promise<void>((resolve) => {
+      step = "finalisation";
+      if (photoUrl) void new Promise<void>((resolve) => {
         const img = new Image();
         img.onload = () => { console.info("[photo_health][modifier]", member.numero_membre, "ok"); resolve(); };
         img.onerror = () => { console.error("[photo_health][modifier] photo illisible", photoUrl); resolve(); };
         img.src = photoUrl;
-        setTimeout(resolve, 4000);
+        setTimeout(resolve, 600);
       });
       toast.success("Membre modifié, carte régénérée");
       nav({ to: "/admin/membres" });

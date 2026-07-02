@@ -30,7 +30,7 @@ async function fileToBase64(file: File): Promise<string> {
   return btoa(bin);
 }
 
-async function compressImage(file: File, maxDim = 1280, quality = 0.82): Promise<Blob> {
+async function compressImage(file: File, maxDim = 760, quality = 0.72): Promise<Blob> {
   if (!file.type.startsWith("image/")) return file;
   const bmp = await createImageBitmap(file).catch(() => null);
   if (!bmp) return file;
@@ -83,7 +83,7 @@ function NouveauMembre() {
     let step = "init";
     try {
       step = "upload_photo";
-      const blob = await compressImage(photo, 1024, 0.8);
+      const blob = await compressImage(photo, 760, 0.72);
       const f = new File([blob], `photo-${Date.now()}.jpg`, { type: "image/jpeg" });
       const b64 = await fileToBase64(f);
       const path = `${Date.now()}-${form.telephone.replace(/\D/g, "")}.jpg`;
@@ -92,7 +92,7 @@ function NouveauMembre() {
       let justificatifUrl: string | null = null;
       if (form.typePreuve === "photo_document" && preuve) {
         step = "upload_justificatif";
-        const pb = preuve.type.startsWith("image/") ? await compressImage(preuve, 1600, 0.85) : preuve;
+        const pb = preuve.type.startsWith("image/") ? await compressImage(preuve, 900, 0.72) : preuve;
         const pf = new File([pb], preuve.name, { type: pb.type || preuve.type });
         const pbb64 = await fileToBase64(pf);
         const ppath = `inscription-${Date.now()}-${form.telephone.replace(/\D/g, "")}-${preuve.name}`;
@@ -134,14 +134,14 @@ function NouveauMembre() {
         }
       });
 
-      step = "photo_health";
+      step = "finalisation";
       if (photoRes.url) {
-        await new Promise<void>((resolve) => {
+        void new Promise<void>((resolve) => {
           const img = new Image();
           img.onload = () => resolve();
           img.onerror = () => { console.warn("[photo_health] photo non lisible:", photoRes.url); resolve(); };
           img.src = photoRes.url!;
-          setTimeout(resolve, 4000);
+          setTimeout(resolve, 600);
         });
       }
 
