@@ -68,6 +68,11 @@ function NouveauMembre() {
   const [busy, setBusy] = useState(false);
   const [errorDetail, setErrorDetail] = useState<{ step: string; message: string; raw?: any } | null>(null);
 
+  const draft = useFormDraft("anzrbo:draft:membre-nouveau", { form, ayants }, (v) => {
+    if (v?.form) setForm((f) => ({ ...f, ...v.form }));
+    if (Array.isArray(v?.ayants) && v.ayants.length) setAyants(v.ayants);
+  });
+
   function set<K extends keyof typeof form>(k: K, v: any) { setForm((f) => ({ ...f, [k]: v })); }
 
   async function submit(e: React.FormEvent) {
