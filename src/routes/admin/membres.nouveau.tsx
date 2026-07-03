@@ -74,6 +74,10 @@ function NouveauMembre() {
   });
 
   function set<K extends keyof typeof form>(k: K, v: any) { setForm((f) => ({ ...f, [k]: v })); }
+  const UPPER_FIELDS = new Set<keyof typeof form>(["nom","prenoms","village","quartier","lieuNaissance","urgenceNom","urgenceAdresse","notes"]);
+  function setUpper<K extends keyof typeof form>(k: K, v: string) {
+    setForm((f) => ({ ...f, [k]: UPPER_FIELDS.has(k) ? v.toUpperCase() : v }));
+  }
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -188,8 +192,8 @@ function NouveauMembre() {
                   onChange={(e) => setPhoto(e.target.files?.[0] ?? null)} />
                 <p className="mt-1 text-xs text-muted-foreground">Compression automatique avant envoi.</p>
               </div>
-              <Field label="Nom *"><Input value={form.nom} onChange={(e) => set("nom", e.target.value)} required /></Field>
-              <Field label="Prénoms *"><Input value={form.prenoms} onChange={(e) => set("prenoms", e.target.value)} required /></Field>
+              <Field label="Nom *"><Input value={form.nom} onChange={(e) => setUpper("nom", e.target.value)} required className="uppercase" /></Field>
+              <Field label="Prénoms *"><Input value={form.prenoms} onChange={(e) => setUpper("prenoms", e.target.value)} required className="uppercase" /></Field>
               <Field label="Téléphone * (unique)"><Input type="tel" value={form.telephone} onChange={(e) => set("telephone", e.target.value)} required /></Field>
               <Field label="Second contact"><Input type="tel" value={form.contact2} onChange={(e) => set("contact2", e.target.value)} /></Field>
               <Field label="Sexe">
@@ -207,10 +211,10 @@ function NouveauMembre() {
                   <SelectContent><SelectItem value="Bonon">Bonon</SelectItem></SelectContent>
                 </Select>
               </Field>
-              <Field label="Village *"><Input value={form.village} onChange={(e) => set("village", e.target.value)} required /></Field>
-              <Field label="Quartier / Campement"><Input value={form.quartier} onChange={(e) => set("quartier", e.target.value)} /></Field>
+              <Field label="Village *"><Input value={form.village} onChange={(e) => setUpper("village", e.target.value)} required className="uppercase" /></Field>
+              <Field label="Quartier / Campement"><Input value={form.quartier} onChange={(e) => setUpper("quartier", e.target.value)} className="uppercase" /></Field>
               <Field label="Date de naissance *"><Input type="date" value={form.dateNaissance} onChange={(e) => set("dateNaissance", e.target.value)} required /></Field>
-              <Field label="Lieu de naissance *"><Input value={form.lieuNaissance} onChange={(e) => set("lieuNaissance", e.target.value)} required /></Field>
+              <Field label="Lieu de naissance *"><Input value={form.lieuNaissance} onChange={(e) => setUpper("lieuNaissance", e.target.value)} required className="uppercase" /></Field>
             </CardContent>
           </Card>
 

@@ -124,8 +124,8 @@ function ListeMembres() {
                     <TableCell className="text-right">
                       <Button size="sm" variant="ghost" onClick={() => setSelectedId(m.id)}><Eye className="h-4 w-4" /></Button>
                       <Button size="sm" variant="ghost" onClick={() => nav({ to: "/admin/membres/$id/modifier" as any, params: { id: m.id } as any })} title="Modifier le membre"><Pencil className="h-4 w-4" /></Button>
-                      <Button size="sm" variant="ghost" onClick={() => window.open(`/verifier/${encodeURIComponent(m.numero_membre)}`, "_blank")} title="Aperçu carte / QR"><QrCode className="h-4 w-4" /></Button>
-                      <Button size="sm" variant="ghost" onClick={() => window.open(`/verifier/${encodeURIComponent(m.numero_membre)}?print=1`, "_blank")} title="Imprimer carte"><Printer className="h-4 w-4" /></Button>
+                      <Button size="sm" variant="ghost" onClick={() => nav({ to: "/verifier/$telephone", params: { telephone: m.numero_membre } })} title="Aperçu carte / QR"><QrCode className="h-4 w-4" /></Button>
+                      <Button size="sm" variant="ghost" onClick={() => nav({ to: "/print", search: { q: m.numero_membre } as any })} title="Imprimer carte"><Printer className="h-4 w-4" /></Button>
                       <Button size="sm" variant="ghost" onClick={() => {
                         if (confirm(`Supprimer ${m.prenoms} ${m.nom} ?`)) delMut.mutate(m.id);
                       }}><Trash2 className="h-4 w-4 text-rose-600" /></Button>
@@ -168,8 +168,10 @@ function FicheDialog({ id, onClose }: { id: string | null; onClose: () => void }
   });
 
   const [montant, setMontant] = useState(1000);
-  const [periode, setPeriode] = useState("");
   const [type, setType] = useState("cotisation");
+  const [methode, setMethode] = useState<"especes" | "mobile_money">("especes");
+  const [typePreuve, setTypePreuve] = useState<"id_transaction" | "photo_document">("id_transaction");
+  const [refExterne, setRefExterne] = useState("");
   const [justif, setJustif] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
   const [payError, setPayError] = useState<{ step: string; message: string; raw?: any } | null>(null);
@@ -185,12 +187,14 @@ function FicheDialog({ id, onClose }: { id: string | null; onClose: () => void }
 
   async function ajouterPaiement() {
     if (!id) return;
+    if (typePreuve === "id_transaction" && !refExterne.trim()) { toast.error("ID de transaction requis."); return; }
+    if (typePreuve === "photo_document" && !justif) { toast.error("Justificatif requis."); return; }
     setBusy(true);
     setPayError(null);
     let step = "init";
     try {
       let url: string | null = null;
-      if (justif) {
+      if (typePreuve === "photo_document" && justif) {
         step = "upload_justificatif";
         const b64 = await fileToBase64Safe(justif);
         const r = await uploadFn({ data: {
@@ -202,9 +206,14 @@ function FicheDialog({ id, onClose }: { id: string | null; onClose: () => void }
         url = r.url;
       }
       step = "create_paiement";
-      await addPayFn({ data: { member_id: id, paiement: { type, montant, periode: periode || null, justificatif_url: url, methode: "especes" } } });
+      await addPayFn({ data: { member_id: id, paiement: {
+        type, montant,
+        methode,
+        reference_externe: typePreuve === "id_transaction" ? refExterne.trim() : null,
+        justificatif_url: url,
+      } } });
       toast.success("Paiement enregistré");
-      setJustif(null); setPeriode("");
+      setJustif(null); setRefExterne("");
       qc.invalidateQueries({ queryKey: ["member", id] });
     } catch (e: any) {
       const message = e?.message ?? String(e) ?? "Erreur inconnue";
@@ -255,21 +264,32 @@ function FicheDialog({ id, onClose }: { id: string | null; onClose: () => void }
                 {data.paiements.length === 0 && <li>Aucun paiement.</li>}
               </ul>
 
-              <div className="mt-3 grid grid-cols-2 gap-2 rounded-md border p-3 md:grid-cols-5">
+              <div className="mt-3 grid gap-2 rounded-md border p-3 md:grid-cols-6">
                 <select className="rounded border px-2 py-1" value={type} onChange={(e) => setType(e.target.value)}>
-                  <option value="cotisation">Cotisation</option>
-                  <option value="nsia">NSIA</option>
+                  <option value="cotisation">Cotisation (décès)</option>
+                  <option value="assistance">Assistance</option>
                   <option value="autre">Autre</option>
                 </select>
-                <Input type="number" value={montant} onChange={(e) => setMontant(+e.target.value)} placeholder="Montant" />
-                <Input value={periode} onChange={(e) => setPeriode(e.target.value)} placeholder="Période (2026-01)" />
-                <Input type="file" accept="image/*,application/pdf" capture="environment"
-                  onChange={(e) => setJustif(e.target.files?.[0] ?? null)} />
+                <Input type="number" value={montant} onChange={(e) => setMontant(+e.target.value)} placeholder="Montant (F)" />
+                <select className="rounded border px-2 py-1" value={methode} onChange={(e) => setMethode(e.target.value as any)}>
+                  <option value="especes">Espèces</option>
+                  <option value="mobile_money">Mobile Money</option>
+                </select>
+                <select className="rounded border px-2 py-1" value={typePreuve} onChange={(e) => setTypePreuve(e.target.value as any)}>
+                  <option value="id_transaction">ID transaction</option>
+                  <option value="photo_document">Photo/document</option>
+                </select>
+                {typePreuve === "id_transaction" ? (
+                  <Input value={refExterne} onChange={(e) => setRefExterne(e.target.value)} placeholder="ID de transaction" />
+                ) : (
+                  <Input type="file" accept="image/*,application/pdf" capture="environment"
+                    onChange={(e) => setJustif(e.target.files?.[0] ?? null)} />
+                )}
                 <Button onClick={ajouterPaiement} disabled={busy}>
                   <Receipt className="mr-1 h-4 w-4" /> {busy ? "…" : "Ajouter"}
                 </Button>
                 {payError && (
-                  <div className="col-span-2 rounded-md border border-destructive/40 bg-destructive/5 p-2 text-xs text-destructive md:col-span-5">
+                  <div className="col-span-2 rounded-md border border-destructive/40 bg-destructive/5 p-2 text-xs text-destructive md:col-span-6">
                     <div className="font-semibold">Échec paiement — {payError.step}</div>
                     <div className="break-words">{payError.message}</div>
                     <div className="text-muted-foreground">Détails complets dans la console.</div>

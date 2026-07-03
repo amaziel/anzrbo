@@ -203,8 +203,9 @@ export function MemberCardVerso({ m }: { m: Membre }) {
 
       <div className="absolute bottom-[7mm] left-[3mm] right-[3mm] grid grid-cols-[1fr_1fr] gap-[2mm]">
         <div className="rounded-[1mm] border border-[#c9a24c] px-[2mm] py-[1.2mm]">
-          <div className="text-[1.7mm] font-bold text-[#0c5b2e]">Secrétariat Général (SG)</div>
-          <div className="font-mono text-[2mm] font-bold text-[#1a1a1a]">+225 07 59 56 60 87</div>
+          <div className="text-[1.7mm] font-bold text-[#0c5b2e]">Contacts ANZRBO</div>
+          <div className="font-mono text-[1.9mm] font-bold text-[#1a1a1a]">+225 07 78 81 77 84</div>
+          <div className="font-mono text-[1.9mm] font-bold text-[#1a1a1a]">+225 07 07 17 56 32</div>
         </div>
         <ul className="space-y-[0.4mm] text-[1.6mm]">
           <li>✓ Carte strictement personnelle.</li>

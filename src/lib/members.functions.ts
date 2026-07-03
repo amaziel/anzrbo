@@ -238,21 +238,32 @@ export const createMember = createServerFn({ method: "POST" })
     await assertAnzrboAdmin(context.supabase, context.userId);
     const db = await getTrustedDbClient(context);
 
+    // Idempotence : si le téléphone existe déjà (reprise brouillon / double submit),
+    // renvoyer le membre existant plutôt qu'en recréer un.
+    const telDigits = data.telephone.replace(/\D/g, "");
+    const { data: existing } = await db
+      .from("members")
+      .select("*")
+      .or(`telephone.eq.${data.telephone.trim()},telephone.eq.${telDigits}`)
+      .limit(1)
+      .maybeSingle();
+    if (existing) return { ok: true, member: existing as MemberRow, duplicate: true };
+
     const numero = genNumero();
     const { data: m, error } = await db
       .from("members")
       .insert({
         numero_membre: numero,
-        nom: data.nom.trim(),
-        prenoms: data.prenoms.trim(),
+        nom: data.nom.trim().toUpperCase(),
+        prenoms: data.prenoms.trim().toUpperCase(),
         telephone: data.telephone.trim(),
         contact2: data.contact2 || null,
         sexe: data.sexe || null,
         date_naissance: data.date_naissance,
-        lieu_naissance: data.lieu_naissance,
+        lieu_naissance: (data.lieu_naissance || "").toUpperCase(),
         ville: data.ville || "Bonon",
-        quartier: data.quartier || null,
-        adresse: data.adresse || null,
+        quartier: (data.quartier || "").toUpperCase() || null,
+        adresse: (data.adresse || "").toUpperCase() || null,
         photo_url: data.photo_url || null,
         date_inscription: new Date().toISOString().slice(0, 10),
         statut: "actif",
@@ -434,10 +445,13 @@ export const verifyMemberPublic = createServerFn({ method: "POST" })
       .from("members")
       .select("id,numero_membre,photo_url,nom,prenoms,telephone,contact2,ville,quartier,adresse,date_naissance,lieu_naissance,date_inscription,statut")
       .limit(1);
-    if (digits) {
-      query = query.or(`telephone.eq.${digits},contact2.eq.${digits},telephone.eq.${raw},contact2.eq.${raw},numero_membre.eq.${raw}`);
+    if (digits && digits.length >= 8) {
+      const pat = `%${digits}%`;
+      query = query.or(
+        `telephone.eq.${digits},contact2.eq.${digits},telephone.eq.${raw},contact2.eq.${raw},telephone.ilike.${pat},contact2.ilike.${pat},numero_membre.ilike.%${raw}%`,
+      );
     } else {
-      query = query.eq("numero_membre", raw);
+      query = query.or(`numero_membre.eq.${raw},numero_membre.ilike.%${raw}%`);
     }
     const { data: rows, error } = await query;
     if (error) throw new Error(error.message);
