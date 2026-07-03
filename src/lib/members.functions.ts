@@ -445,10 +445,13 @@ export const verifyMemberPublic = createServerFn({ method: "POST" })
       .from("members")
       .select("id,numero_membre,photo_url,nom,prenoms,telephone,contact2,ville,quartier,adresse,date_naissance,lieu_naissance,date_inscription,statut")
       .limit(1);
-    if (digits) {
-      query = query.or(`telephone.eq.${digits},contact2.eq.${digits},telephone.eq.${raw},contact2.eq.${raw},numero_membre.eq.${raw}`);
+    if (digits && digits.length >= 8) {
+      const pat = `%${digits}%`;
+      query = query.or(
+        `telephone.eq.${digits},contact2.eq.${digits},telephone.eq.${raw},contact2.eq.${raw},telephone.ilike.${pat},contact2.ilike.${pat},numero_membre.ilike.%${raw}%`,
+      );
     } else {
-      query = query.eq("numero_membre", raw);
+      query = query.or(`numero_membre.eq.${raw},numero_membre.ilike.%${raw}%`);
     }
     const { data: rows, error } = await query;
     if (error) throw new Error(error.message);
