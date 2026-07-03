@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as SeedInitRouteImport } from './routes/seed-init'
 import { Route as ScannerRouteImport } from './routes/scanner'
+import { Route as PrintRouteImport } from './routes/print'
 import { Route as NsiaRouteImport } from './routes/nsia'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as FaqRouteImport } from './routes/faq'
@@ -45,6 +46,11 @@ const SeedInitRoute = SeedInitRouteImport.update({
 const ScannerRoute = ScannerRouteImport.update({
   id: '/scanner',
   path: '/scanner',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PrintRoute = PrintRouteImport.update({
+  id: '/print',
+  path: '/print',
   getParentRoute: () => rootRouteImport,
 } as any)
 const NsiaRoute = NsiaRouteImport.update({
@@ -151,6 +157,7 @@ export interface FileRoutesByFullPath {
   '/faq': typeof FaqRoute
   '/login': typeof LoginRoute
   '/nsia': typeof NsiaRoute
+  '/print': typeof PrintRoute
   '/scanner': typeof ScannerRoute
   '/seed-init': typeof SeedInitRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
@@ -175,6 +182,7 @@ export interface FileRoutesByTo {
   '/faq': typeof FaqRoute
   '/login': typeof LoginRoute
   '/nsia': typeof NsiaRoute
+  '/print': typeof PrintRoute
   '/scanner': typeof ScannerRoute
   '/seed-init': typeof SeedInitRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
@@ -199,6 +207,7 @@ export interface FileRoutesById {
   '/faq': typeof FaqRoute
   '/login': typeof LoginRoute
   '/nsia': typeof NsiaRoute
+  '/print': typeof PrintRoute
   '/scanner': typeof ScannerRoute
   '/seed-init': typeof SeedInitRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
@@ -225,6 +234,7 @@ export interface FileRouteTypes {
     | '/faq'
     | '/login'
     | '/nsia'
+    | '/print'
     | '/scanner'
     | '/seed-init'
     | '/sitemap.xml'
@@ -249,6 +259,7 @@ export interface FileRouteTypes {
     | '/faq'
     | '/login'
     | '/nsia'
+    | '/print'
     | '/scanner'
     | '/seed-init'
     | '/sitemap.xml'
@@ -272,6 +283,7 @@ export interface FileRouteTypes {
     | '/faq'
     | '/login'
     | '/nsia'
+    | '/print'
     | '/scanner'
     | '/seed-init'
     | '/sitemap.xml'
@@ -297,6 +309,7 @@ export interface RootRouteChildren {
   FaqRoute: typeof FaqRoute
   LoginRoute: typeof LoginRoute
   NsiaRoute: typeof NsiaRoute
+  PrintRoute: typeof PrintRoute
   ScannerRoute: typeof ScannerRoute
   SeedInitRoute: typeof SeedInitRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
@@ -333,6 +346,13 @@ declare module '@tanstack/react-router' {
       path: '/scanner'
       fullPath: '/scanner'
       preLoaderRoute: typeof ScannerRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/print': {
+      id: '/print'
+      path: '/print'
+      fullPath: '/print'
+      preLoaderRoute: typeof PrintRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/nsia': {
@@ -493,6 +513,7 @@ const rootRouteChildren: RootRouteChildren = {
   FaqRoute: FaqRoute,
   LoginRoute: LoginRoute,
   NsiaRoute: NsiaRoute,
+  PrintRoute: PrintRoute,
   ScannerRoute: ScannerRoute,
   SeedInitRoute: SeedInitRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,

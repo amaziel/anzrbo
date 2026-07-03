@@ -168,8 +168,10 @@ function FicheDialog({ id, onClose }: { id: string | null; onClose: () => void }
   });
 
   const [montant, setMontant] = useState(1000);
-  const [periode, setPeriode] = useState("");
   const [type, setType] = useState("cotisation");
+  const [methode, setMethode] = useState<"especes" | "mobile_money">("especes");
+  const [typePreuve, setTypePreuve] = useState<"id_transaction" | "photo_document">("id_transaction");
+  const [refExterne, setRefExterne] = useState("");
   const [justif, setJustif] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
   const [payError, setPayError] = useState<{ step: string; message: string; raw?: any } | null>(null);
@@ -185,12 +187,14 @@ function FicheDialog({ id, onClose }: { id: string | null; onClose: () => void }
 
   async function ajouterPaiement() {
     if (!id) return;
+    if (typePreuve === "id_transaction" && !refExterne.trim()) { toast.error("ID de transaction requis."); return; }
+    if (typePreuve === "photo_document" && !justif) { toast.error("Justificatif requis."); return; }
     setBusy(true);
     setPayError(null);
     let step = "init";
     try {
       let url: string | null = null;
-      if (justif) {
+      if (typePreuve === "photo_document" && justif) {
         step = "upload_justificatif";
         const b64 = await fileToBase64Safe(justif);
         const r = await uploadFn({ data: {
@@ -202,9 +206,14 @@ function FicheDialog({ id, onClose }: { id: string | null; onClose: () => void }
         url = r.url;
       }
       step = "create_paiement";
-      await addPayFn({ data: { member_id: id, paiement: { type, montant, periode: periode || null, justificatif_url: url, methode: "especes" } } });
+      await addPayFn({ data: { member_id: id, paiement: {
+        type, montant,
+        methode,
+        reference_externe: typePreuve === "id_transaction" ? refExterne.trim() : null,
+        justificatif_url: url,
+      } } });
       toast.success("Paiement enregistré");
-      setJustif(null); setPeriode("");
+      setJustif(null); setRefExterne("");
       qc.invalidateQueries({ queryKey: ["member", id] });
     } catch (e: any) {
       const message = e?.message ?? String(e) ?? "Erreur inconnue";
