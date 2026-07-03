@@ -61,6 +61,7 @@ function Page() {
       dateSouscription: date, actif: true,
     });
     toast.success(`Souscription NSIA enregistrée pour ${m.prenoms} ${m.nom}`);
+    draft.clear();
     nav({ to: "/admin/nsia" });
   }
 
