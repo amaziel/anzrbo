@@ -12,6 +12,7 @@ import { toast } from "sonner";
 import { useAuth, clientRoleGuard } from "@/lib/auth";
 import { AyantsDroitFields, EMPTY_AYANT, relationToEnum, type AyantDroit } from "@/components/AyantsDroitFields";
 import { createMember, uploadFile } from "@/lib/members.functions";
+import { useFormDraft } from "@/lib/useFormDraft";
 
 export const Route = createFileRoute("/admin/membres/nouveau")({
   beforeLoad: () => { const r = clientRoleGuard(["admin_anzrbo"]); if (r) throw r; },
@@ -66,6 +67,11 @@ function NouveauMembre() {
   const [ayants, setAyants] = useState<AyantDroit[]>([{ ...EMPTY_AYANT }]);
   const [busy, setBusy] = useState(false);
   const [errorDetail, setErrorDetail] = useState<{ step: string; message: string; raw?: any } | null>(null);
+
+  const draft = useFormDraft("anzrbo:draft:membre-nouveau", { form, ayants }, (v) => {
+    if (v?.form) setForm((f) => ({ ...f, ...v.form }));
+    if (Array.isArray(v?.ayants) && v.ayants.length) setAyants(v.ayants);
+  });
 
   function set<K extends keyof typeof form>(k: K, v: any) { setForm((f) => ({ ...f, [k]: v })); }
 
@@ -146,6 +152,7 @@ function NouveauMembre() {
       }
 
       toast.success(`Membre enregistré : ${res.member.numero_membre}`);
+      draft.clear();
       setTimeout(() => nav({ to: "/admin/membres" }), 600);
     } catch (err: any) {
       const message = err?.message ?? String(err) ?? "Erreur inconnue";

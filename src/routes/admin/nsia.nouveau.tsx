@@ -12,6 +12,7 @@ import {
 } from "@/lib/data";
 import { ShieldCheck, ArrowLeft, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
+import { useFormDraft } from "@/lib/useFormDraft";
 
 export const Route = createFileRoute("/admin/nsia/nouveau")({
   beforeLoad: () => { const r = clientRoleGuard(["admin_anzrbo"]); if (r) throw r; },
@@ -28,6 +29,17 @@ function Page() {
   const [formule, setFormule] = useState<number>(5);
   const [nbPersonnes, setNbPersonnes] = useState<number>(1);
   const [date, setDate] = useState<string>(new Date().toISOString().slice(0, 10));
+
+  const draft = useFormDraft(
+    "anzrbo:draft:nsia-nouveau",
+    { membreId, formule, nbPersonnes, date },
+    (v) => {
+      if (v?.membreId != null) setMembreId(v.membreId);
+      if (v?.formule != null) setFormule(v.formule);
+      if (v?.nbPersonnes != null) setNbPersonnes(v.nbPersonnes);
+      if (v?.date != null) setDate(v.date);
+    },
+  );
 
   const eligibles = useMemo(
     () => MEMBRES.filter((m) => m.statut === "actif" && !souscriptionDe(m.id)),
@@ -49,6 +61,7 @@ function Page() {
       dateSouscription: date, actif: true,
     });
     toast.success(`Souscription NSIA enregistrée pour ${m.prenoms} ${m.nom}`);
+    draft.clear();
     nav({ to: "/admin/nsia" });
   }
 
