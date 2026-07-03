@@ -12,6 +12,7 @@ import { toast } from "sonner";
 import { useAuth, clientRoleGuard } from "@/lib/auth";
 import { AyantsDroitFields, EMPTY_AYANT, relationToEnum, type AyantDroit } from "@/components/AyantsDroitFields";
 import { createMember, uploadFile } from "@/lib/members.functions";
+import { useFormDraft } from "@/lib/useFormDraft";
 
 export const Route = createFileRoute("/admin/membres/nouveau")({
   beforeLoad: () => { const r = clientRoleGuard(["admin_anzrbo"]); if (r) throw r; },
