@@ -30,6 +30,17 @@ function Page() {
   const [nbPersonnes, setNbPersonnes] = useState<number>(1);
   const [date, setDate] = useState<string>(new Date().toISOString().slice(0, 10));
 
+  const draft = useFormDraft(
+    "anzrbo:draft:nsia-nouveau",
+    { membreId, formule, nbPersonnes, date },
+    (v) => {
+      if (v?.membreId != null) setMembreId(v.membreId);
+      if (v?.formule != null) setFormule(v.formule);
+      if (v?.nbPersonnes != null) setNbPersonnes(v.nbPersonnes);
+      if (v?.date != null) setDate(v.date);
+    },
+  );
+
   const eligibles = useMemo(
     () => MEMBRES.filter((m) => m.statut === "actif" && !souscriptionDe(m.id)),
     [],
