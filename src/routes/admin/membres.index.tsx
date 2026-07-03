@@ -124,8 +124,8 @@ function ListeMembres() {
                     <TableCell className="text-right">
                       <Button size="sm" variant="ghost" onClick={() => setSelectedId(m.id)}><Eye className="h-4 w-4" /></Button>
                       <Button size="sm" variant="ghost" onClick={() => nav({ to: "/admin/membres/$id/modifier" as any, params: { id: m.id } as any })} title="Modifier le membre"><Pencil className="h-4 w-4" /></Button>
-                      <Button size="sm" variant="ghost" onClick={() => window.open(`/verifier/${encodeURIComponent(m.numero_membre)}`, "_blank")} title="Aperçu carte / QR"><QrCode className="h-4 w-4" /></Button>
-                      <Button size="sm" variant="ghost" onClick={() => window.open(`/verifier/${encodeURIComponent(m.numero_membre)}?print=1`, "_blank")} title="Imprimer carte"><Printer className="h-4 w-4" /></Button>
+                      <Button size="sm" variant="ghost" onClick={() => nav({ to: "/verifier/$telephone", params: { telephone: m.numero_membre } })} title="Aperçu carte / QR"><QrCode className="h-4 w-4" /></Button>
+                      <Button size="sm" variant="ghost" onClick={() => nav({ to: "/print", search: { q: m.numero_membre } as any })} title="Imprimer carte"><Printer className="h-4 w-4" /></Button>
                       <Button size="sm" variant="ghost" onClick={() => {
                         if (confirm(`Supprimer ${m.prenoms} ${m.nom} ?`)) delMut.mutate(m.id);
                       }}><Trash2 className="h-4 w-4 text-rose-600" /></Button>
