@@ -74,6 +74,10 @@ function NouveauMembre() {
   });
 
   function set<K extends keyof typeof form>(k: K, v: any) { setForm((f) => ({ ...f, [k]: v })); }
+  const UPPER_FIELDS = new Set<keyof typeof form>(["nom","prenoms","village","quartier","lieuNaissance","urgenceNom","urgenceAdresse","notes"]);
+  function setUpper<K extends keyof typeof form>(k: K, v: string) {
+    setForm((f) => ({ ...f, [k]: UPPER_FIELDS.has(k) ? v.toUpperCase() : v }));
+  }
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
