@@ -12,6 +12,7 @@ import {
 } from "@/lib/data";
 import { ShieldCheck, ArrowLeft, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
+import { useFormDraft } from "@/lib/useFormDraft";
 
 export const Route = createFileRoute("/admin/nsia/nouveau")({
   beforeLoad: () => { const r = clientRoleGuard(["admin_anzrbo"]); if (r) throw r; },
