@@ -264,21 +264,32 @@ function FicheDialog({ id, onClose }: { id: string | null; onClose: () => void }
                 {data.paiements.length === 0 && <li>Aucun paiement.</li>}
               </ul>
 
-              <div className="mt-3 grid grid-cols-2 gap-2 rounded-md border p-3 md:grid-cols-5">
+              <div className="mt-3 grid gap-2 rounded-md border p-3 md:grid-cols-6">
                 <select className="rounded border px-2 py-1" value={type} onChange={(e) => setType(e.target.value)}>
-                  <option value="cotisation">Cotisation</option>
-                  <option value="nsia">NSIA</option>
+                  <option value="cotisation">Cotisation (décès)</option>
+                  <option value="assistance">Assistance</option>
                   <option value="autre">Autre</option>
                 </select>
-                <Input type="number" value={montant} onChange={(e) => setMontant(+e.target.value)} placeholder="Montant" />
-                <Input value={periode} onChange={(e) => setPeriode(e.target.value)} placeholder="Période (2026-01)" />
-                <Input type="file" accept="image/*,application/pdf" capture="environment"
-                  onChange={(e) => setJustif(e.target.files?.[0] ?? null)} />
+                <Input type="number" value={montant} onChange={(e) => setMontant(+e.target.value)} placeholder="Montant (F)" />
+                <select className="rounded border px-2 py-1" value={methode} onChange={(e) => setMethode(e.target.value as any)}>
+                  <option value="especes">Espèces</option>
+                  <option value="mobile_money">Mobile Money</option>
+                </select>
+                <select className="rounded border px-2 py-1" value={typePreuve} onChange={(e) => setTypePreuve(e.target.value as any)}>
+                  <option value="id_transaction">ID transaction</option>
+                  <option value="photo_document">Photo/document</option>
+                </select>
+                {typePreuve === "id_transaction" ? (
+                  <Input value={refExterne} onChange={(e) => setRefExterne(e.target.value)} placeholder="ID de transaction" />
+                ) : (
+                  <Input type="file" accept="image/*,application/pdf" capture="environment"
+                    onChange={(e) => setJustif(e.target.files?.[0] ?? null)} />
+                )}
                 <Button onClick={ajouterPaiement} disabled={busy}>
                   <Receipt className="mr-1 h-4 w-4" /> {busy ? "…" : "Ajouter"}
                 </Button>
                 {payError && (
-                  <div className="col-span-2 rounded-md border border-destructive/40 bg-destructive/5 p-2 text-xs text-destructive md:col-span-5">
+                  <div className="col-span-2 rounded-md border border-destructive/40 bg-destructive/5 p-2 text-xs text-destructive md:col-span-6">
                     <div className="font-semibold">Échec paiement — {payError.step}</div>
                     <div className="break-words">{payError.message}</div>
                     <div className="text-muted-foreground">Détails complets dans la console.</div>
