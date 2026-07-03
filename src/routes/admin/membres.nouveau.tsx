@@ -152,6 +152,7 @@ function NouveauMembre() {
       }
 
       toast.success(`Membre enregistré : ${res.member.numero_membre}`);
+      draft.clear();
       setTimeout(() => nav({ to: "/admin/membres" }), 600);
     } catch (err: any) {
       const message = err?.message ?? String(err) ?? "Erreur inconnue";
