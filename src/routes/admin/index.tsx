@@ -205,9 +205,9 @@ function AdminDashboard() {
         {/* Alertes dynamiques (CDC §6.2) */}
         <section className="grid gap-4 md:grid-cols-3">
           <AlerteBox title="Membres en carence (< 3 mois)" count={alertesCarence.length} variant="warn"
-            items={alertesCarence.map((m) => `${m.prenoms} ${m.nom} — éligible le ${new Date(new Date(m.dateInscription).setMonth(new Date(m.dateInscription).getMonth() + 3)).toLocaleDateString("fr-FR")}`)} />
+            items={alertesCarence.map((m: any) => `${m.prenoms} ${m.nom} — éligible le ${new Date(new Date(m.date_inscription).setMonth(new Date(m.date_inscription).getMonth() + 3)).toLocaleDateString("fr-FR")}`)} />
           <AlerteBox title="Membres avec cotisations non payées" count={alertesNonAJour.length} variant="danger"
-            items={alertesNonAJour.map((m) => `${m.prenoms} ${m.nom} (${m.telephone})`)} />
+            items={alertesNonAJour.map((m: any) => `${m.prenoms} ${m.nom} (${m.telephone})`)} />
           <AlerteBox title="Dossiers d'assistance en attente" count={dossiersEnAttente.length} variant="info"
             items={dossiersEnAttente.map((a) => {
               const d = DECLARATIONS.find((x) => x.id === a.declarationId);
