@@ -99,7 +99,7 @@ function ModifierMembre() {
       let photoUrl = form.photo_url;
       if (photo) {
         step = "upload_photo";
-        const blob = await compressImage(photo, 760, 0.72);
+        const blob = await compressImage(photo, 640, 0.66);
         const f = new File([blob], `photo-${Date.now()}.jpg`, { type: "image/jpeg" });
         const b64 = await fileToBase64(f);
         const path = `${member.id}/${Date.now()}-${form.telephone.replace(/\D/g, "")}.jpg`;
