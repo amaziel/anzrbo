@@ -1,5 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
+import { useServerFn } from "@tanstack/react-start";
+import { useQuery } from "@tanstack/react-query";
 import { DashboardHeader, ADMIN_NAV } from "@/components/DashboardHeader";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -14,9 +16,9 @@ import {
 } from "lucide-react";
 import { useAuth, clientRoleGuard } from "@/lib/auth";
 import {
-  MEMBRES, DECLARATIONS, ASSISTANCES, statsAnzrbo, aJour,
-  COTISATIONS, ayantsDroitDe,
+  DECLARATIONS, ASSISTANCES, statsAnzrbo, COTISATIONS,
 } from "@/lib/data";
+import { listMembers } from "@/lib/members.functions";
 
 export const Route = createFileRoute("/admin/")({
   beforeLoad: () => { const r = clientRoleGuard(["admin_anzrbo"]); if (r) throw r; },
