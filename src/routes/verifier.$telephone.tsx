@@ -21,6 +21,14 @@ export const Route = createFileRoute("/verifier/$telephone")({
 });
 
 function clean(v: string) { return v.replace(/\D/g, ""); }
+function isMeaningful(v?: string | null) {
+  if (!v) return false;
+  const d = String(v).replace(/\D/g, "");
+  return d.length >= 6 && !/^0+$/.test(d);
+}
+function displayContact(v?: string | null) {
+  return isMeaningful(v) ? String(v).trim() : "";
+}
 
 function Page() {
   const { telephone } = Route.useParams();
@@ -30,7 +38,15 @@ function Page() {
   const [loading, setLoading] = useState(true);
   useEffect(() => {
     setLoading(true);
-    verifyFn({ data: { q: raw } }).then((r) => setRow(r.member)).catch(() => setRow(null)).finally(() => setLoading(false));
+    let alive = true;
+    const load = () => verifyFn({ data: { q: raw } })
+      .then((r) => { if (alive) setRow(r.member); })
+      .catch(() => { if (alive) setRow(null); })
+      .finally(() => { if (alive) setLoading(false); });
+    load();
+    const onFocus = () => load();
+    window.addEventListener("focus", onFocus);
+    return () => { alive = false; window.removeEventListener("focus", onFocus); };
   }, [raw]);
   useEffect(() => {
     if (!loading && row && typeof window !== "undefined" && new URLSearchParams(window.location.search).get("print") === "1") {
