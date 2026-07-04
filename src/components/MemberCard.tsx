@@ -38,20 +38,25 @@ function photoFor(m: Membre) {
   return `https://api.dicebear.com/9.x/initials/svg?seed=${seed}&backgroundColor=0c5b2e,a78838&fontFamily=Georgia`;
 }
 
+const QR_CACHE = new Map<string, string>();
 export function useMemberQr(numeroMembre: string) {
-  const [dataUrl, setDataUrl] = useState<string>("");
+  const url = fullVerifierUrl(numeroMembre);
+  const [dataUrl, setDataUrl] = useState<string>(() => QR_CACHE.get(url) ?? "");
   useEffect(() => {
+    const cached = QR_CACHE.get(url);
+    if (cached) { setDataUrl(cached); return; }
     let cancelled = false;
-    QRCode.toDataURL(fullVerifierUrl(numeroMembre), {
+    QRCode.toDataURL(url, {
       errorCorrectionLevel: "H",
-      margin: 1,
-      width: 360,
-      color: { dark: "#0c5b2e", light: "#ffffff" },
+      margin: 2,
+      width: 512,
+      scale: 8,
+      color: { dark: "#0a3d1f", light: "#ffffff" },
     })
-      .then((d) => { if (!cancelled) setDataUrl(d); })
+      .then((d) => { if (!cancelled) { QR_CACHE.set(url, d); setDataUrl(d); } })
       .catch(() => {});
     return () => { cancelled = true; };
-  }, [numeroMembre]);
+  }, [url]);
   return dataUrl;
 }
 
