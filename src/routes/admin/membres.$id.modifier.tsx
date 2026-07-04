@@ -53,6 +53,7 @@ function ModifierMembre() {
   const getFn = useServerFn(getMember);
   const updateFn = useServerFn(updateMember);
   const uploadFn = useServerFn(uploadFile);
+  const qc = useQueryClient();
   const { data, isLoading, error } = useQuery({ queryKey: ["member-edit", id], queryFn: () => getFn({ data: { id } }), enabled: !!user });
   const member = data?.member;
   const notesObj = useMemo(() => parseNotes(member?.notes ?? null), [member?.notes]);
