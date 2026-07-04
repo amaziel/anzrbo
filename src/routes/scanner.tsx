@@ -18,6 +18,11 @@ export const Route = createFileRoute("/scanner")({
   }),
 });
 
+function isZeroLike(v: string) {
+  const d = (v ?? "").replace(/\D/g, "");
+  return d.length === 0 || /^0+$/.test(d);
+}
+
 function parseTelephone(raw: string): string | null {
   const v = raw.trim();
   if (!v) return null;
@@ -27,10 +32,11 @@ function parseTelephone(raw: string): string | null {
     if (parsed?.numero_membre) return String(parsed.numero_membre);
     if (parsed?.telephone) return String(parsed.telephone);
   } catch { /* QR texte classique */ }
-  // Accepte une URL .../verifier/0700000000 ou un numéro brut
   const m = v.match(/(?:\/m\/|\/verifier\/)([^/?#]+)/i);
   if (m) return decodeURIComponent(m[1]);
-  return v.replace(/[^+\d]/g, "");
+  const cleaned = v.replace(/[^+\d]/g, "");
+  if (isZeroLike(cleaned)) return null;
+  return cleaned || v;
 }
 
 function Page() {
