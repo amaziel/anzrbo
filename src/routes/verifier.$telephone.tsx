@@ -54,14 +54,16 @@ function Page() {
       return () => window.clearTimeout(t);
     }
   }, [loading, row]);
+  const telDisp = displayContact(row?.telephone);
+  const tel2Disp = displayContact(row?.contact2);
   const m = row ? {
     id: row.id,
     numeroMembre: row.numero_membre,
     photoUrl: row.photo_url,
     nom: row.nom,
     prenoms: row.prenoms,
-    telephone: row.telephone,
-    contact2: row.contact2 ?? undefined,
+    telephone: telDisp,
+    contact2: tel2Disp || undefined,
     sousPrefecture: "Bonon" as const,
     village: row.quartier || row.ville || "Bonon",
     quartier: row.adresse ?? undefined,
