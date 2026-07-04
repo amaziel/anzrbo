@@ -36,12 +36,28 @@ function AdminDashboard() {
   const nav = useNavigate();
   useEffect(() => { if (!loading && (!user || !user.roles.includes("admin_anzrbo"))) nav({ to: "/login" }); }, [user, loading, nav]);
 
-  const s = useMemo(() => statsAnzrbo(), []);
+  const listFn = useServerFn(listMembers);
+  const { data: membersData } = useQuery({
+    queryKey: ["members", "dashboard"],
+    queryFn: () => listFn({ data: { q: "", page: 1, pageSize: 100, statut: "" } }),
+    enabled: !!user,
+    refetchOnWindowFocus: true,
+    staleTime: 15_000,
+  });
+  const MEMBRES_DB: any[] = membersData?.rows ?? [];
+  const totalDb = membersData?.total ?? MEMBRES_DB.length;
+
+  const sDemo = useMemo(() => statsAnzrbo(), []);
+  const actifsDb = MEMBRES_DB.filter((m) => m.statut === "actif").length;
+  const suspendusDb = MEMBRES_DB.filter((m) => m.statut === "suspendu").length;
+  const decedesDb = MEMBRES_DB.filter((m) => m.statut === "decede").length;
+  const s = { ...sDemo, total: totalDb, actifs: actifsDb, suspendus: suspendusDb, decedes: decedesDb };
+
   const repartition = useMemo(() => [
-    { name: "Actifs", value: s.actifs, color: "hsl(142 71% 45%)" },
-    { name: "Suspendus", value: s.suspendus, color: "hsl(38 92% 50%)" },
-    { name: "Décédés", value: s.decedes, color: "hsl(0 72% 51%)" },
-  ], [s]);
+    { name: "Actifs", value: actifsDb, color: "hsl(142 71% 45%)" },
+    { name: "Suspendus", value: suspendusDb, color: "hsl(38 92% 50%)" },
+    { name: "Décédés", value: decedesDb, color: "hsl(0 72% 51%)" },
+  ], [actifsDb, suspendusDb, decedesDb]);
 
   const trend = useMemo(() => {
     const buckets = new Map<string, { mois: string; cotisations: number; assistances: number }>();
@@ -62,14 +78,15 @@ function AdminDashboard() {
 
   const alertesCarence = useMemo(() => {
     const now = new Date();
-    return MEMBRES.filter((m) => {
-      const di = new Date(m.dateInscription);
+    return MEMBRES_DB.filter((m) => {
+      if (!m.date_inscription) return false;
+      const di = new Date(m.date_inscription);
       const diffMonths = (now.getFullYear() - di.getFullYear()) * 12 + (now.getMonth() - di.getMonth());
       return diffMonths < 3;
     });
-  }, []);
+  }, [MEMBRES_DB]);
 
-  const alertesNonAJour = useMemo(() => MEMBRES.filter((m) => m.statut === "actif" && !aJour(m.id)), []);
+  const alertesNonAJour: any[] = [];
   const dossiersEnAttente = useMemo(() => ASSISTANCES.filter((a) => a.statut === "en_attente"), []);
 
   if (loading || !user) return <div className="flex min-h-screen items-center justify-center text-muted-foreground">Chargement…</div>;
