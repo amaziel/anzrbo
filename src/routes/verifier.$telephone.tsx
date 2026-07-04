@@ -130,7 +130,8 @@ function Page() {
                   <span className="text-xs text-muted-foreground">Sous-préfecture de {m.sousPrefecture}</span>
                 </Info>
                 <Info icon={<Phone className="h-4 w-4" />} label="Contact public">
-                  <span className="font-mono">{m.telephone}</span>
+                  <span className="font-mono">{m.telephone || "—"}</span>
+                  {m.contact2 ? <><br /><span className="font-mono text-xs text-muted-foreground">{m.contact2}</span></> : null}
                 </Info>
                 <Info icon={<CalendarDays className="h-4 w-4" />} label="Date d'adhésion">
                   {new Date(m.dateInscription).toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" })}
