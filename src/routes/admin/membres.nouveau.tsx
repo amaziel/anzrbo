@@ -31,7 +31,7 @@ async function fileToBase64(file: File): Promise<string> {
   return btoa(bin);
 }
 
-async function compressImage(file: File, maxDim = 760, quality = 0.72): Promise<Blob> {
+async function compressImage(file: File, maxDim = 640, quality = 0.66): Promise<Blob> {
   if (!file.type.startsWith("image/")) return file;
   const bmp = await createImageBitmap(file).catch(() => null);
   if (!bmp) return file;
@@ -41,6 +41,7 @@ async function compressImage(file: File, maxDim = 760, quality = 0.72): Promise<
   canvas.width = w; canvas.height = h;
   const ctx = canvas.getContext("2d")!;
   ctx.drawImage(bmp, 0, 0, w, h);
+  bmp.close?.();
   return await new Promise((res) => canvas.toBlob((b) => res(b ?? file), "image/jpeg", quality));
 }
 
@@ -93,7 +94,7 @@ function NouveauMembre() {
     let step = "init";
     try {
       step = "upload_photo";
-      const blob = await compressImage(photo, 760, 0.72);
+      const blob = await compressImage(photo, 640, 0.66);
       const f = new File([blob], `photo-${Date.now()}.jpg`, { type: "image/jpeg" });
       const b64 = await fileToBase64(f);
       const path = `${Date.now()}-${form.telephone.replace(/\D/g, "")}.jpg`;

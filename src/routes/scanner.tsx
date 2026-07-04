@@ -18,6 +18,11 @@ export const Route = createFileRoute("/scanner")({
   }),
 });
 
+function isZeroLike(v: string) {
+  const d = (v ?? "").replace(/\D/g, "");
+  return d.length === 0 || /^0+$/.test(d);
+}
+
 function parseTelephone(raw: string): string | null {
   const v = raw.trim();
   if (!v) return null;
@@ -27,10 +32,11 @@ function parseTelephone(raw: string): string | null {
     if (parsed?.numero_membre) return String(parsed.numero_membre);
     if (parsed?.telephone) return String(parsed.telephone);
   } catch { /* QR texte classique */ }
-  // Accepte une URL .../verifier/0700000000 ou un numéro brut
   const m = v.match(/(?:\/m\/|\/verifier\/)([^/?#]+)/i);
   if (m) return decodeURIComponent(m[1]);
-  return v.replace(/[^+\d]/g, "");
+  const cleaned = v.replace(/[^+\d]/g, "");
+  if (isZeroLike(cleaned)) return null;
+  return cleaned || v;
 }
 
 function Page() {
@@ -54,11 +60,25 @@ function Page() {
       const { Html5Qrcode } = await import("html5-qrcode");
       const el = document.getElementById("qr-reader");
       if (!el) return;
-      const html5 = new Html5Qrcode("qr-reader");
+      const html5 = new Html5Qrcode("qr-reader", { verbose: false, useBarCodeDetectorIfSupported: true } as any);
       scannerRef.current = html5 as unknown as { stop: () => Promise<void>; clear: () => void };
+      const vw = Math.min(window.innerWidth, 640);
+      const box = Math.max(220, Math.floor(vw * 0.72));
       await html5.start(
         { facingMode: "environment" },
-        { fps: 10, qrbox: { width: 240, height: 240 } },
+        {
+          fps: 24,
+          qrbox: { width: box, height: box },
+          aspectRatio: 1.0,
+          disableFlip: false,
+          experimentalFeatures: { useBarCodeDetectorIfSupported: true },
+          videoConstraints: {
+            facingMode: "environment",
+            width: { ideal: 1920 },
+            height: { ideal: 1080 },
+            advanced: [{ focusMode: "continuous" }, { zoom: 1.5 } as any],
+          },
+        } as any,
         (decoded) => {
           const id = parseTelephone(decoded);
           if (id) {
@@ -79,7 +99,8 @@ function Page() {
   function onManual(e: React.FormEvent) {
     e.preventDefault();
     const id = parseTelephone(manual);
-    if (id) nav({ to: "/verifier/$telephone", params: { telephone: id } });
+    if (!id) { setError("Numéro invalide."); return; }
+    nav({ to: "/verifier/$telephone", params: { telephone: id } });
   }
 
   return (

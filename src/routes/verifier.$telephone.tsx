@@ -21,6 +21,14 @@ export const Route = createFileRoute("/verifier/$telephone")({
 });
 
 function clean(v: string) { return v.replace(/\D/g, ""); }
+function isMeaningful(v?: string | null) {
+  if (!v) return false;
+  const d = String(v).replace(/\D/g, "");
+  return d.length >= 6 && !/^0+$/.test(d);
+}
+function displayContact(v?: string | null) {
+  return isMeaningful(v) ? String(v).trim() : "";
+}
 
 function Page() {
   const { telephone } = Route.useParams();
@@ -30,7 +38,15 @@ function Page() {
   const [loading, setLoading] = useState(true);
   useEffect(() => {
     setLoading(true);
-    verifyFn({ data: { q: raw } }).then((r) => setRow(r.member)).catch(() => setRow(null)).finally(() => setLoading(false));
+    let alive = true;
+    const load = () => verifyFn({ data: { q: raw } })
+      .then((r) => { if (alive) setRow(r.member); })
+      .catch(() => { if (alive) setRow(null); })
+      .finally(() => { if (alive) setLoading(false); });
+    load();
+    const onFocus = () => load();
+    window.addEventListener("focus", onFocus);
+    return () => { alive = false; window.removeEventListener("focus", onFocus); };
   }, [raw]);
   useEffect(() => {
     if (!loading && row && typeof window !== "undefined" && new URLSearchParams(window.location.search).get("print") === "1") {
@@ -38,14 +54,16 @@ function Page() {
       return () => window.clearTimeout(t);
     }
   }, [loading, row]);
+  const telDisp = displayContact(row?.telephone);
+  const tel2Disp = displayContact(row?.contact2);
   const m = row ? {
     id: row.id,
     numeroMembre: row.numero_membre,
     photoUrl: row.photo_url,
     nom: row.nom,
     prenoms: row.prenoms,
-    telephone: row.telephone,
-    contact2: row.contact2 ?? undefined,
+    telephone: telDisp,
+    contact2: tel2Disp || undefined,
     sousPrefecture: "Bonon" as const,
     village: row.quartier || row.ville || "Bonon",
     quartier: row.adresse ?? undefined,
@@ -112,7 +130,8 @@ function Page() {
                   <span className="text-xs text-muted-foreground">Sous-préfecture de {m.sousPrefecture}</span>
                 </Info>
                 <Info icon={<Phone className="h-4 w-4" />} label="Contact public">
-                  <span className="font-mono">{m.telephone}</span>
+                  <span className="font-mono">{m.telephone || "—"}</span>
+                  {m.contact2 ? <><br /><span className="font-mono text-xs text-muted-foreground">{m.contact2}</span></> : null}
                 </Info>
                 <Info icon={<CalendarDays className="h-4 w-4" />} label="Date d'adhésion">
                   {new Date(m.dateInscription).toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" })}

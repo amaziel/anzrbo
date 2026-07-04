@@ -1,5 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
+import { useServerFn } from "@tanstack/react-start";
+import { useQuery } from "@tanstack/react-query";
 import { DashboardHeader, ADMIN_NAV } from "@/components/DashboardHeader";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -14,9 +16,9 @@ import {
 } from "lucide-react";
 import { useAuth, clientRoleGuard } from "@/lib/auth";
 import {
-  MEMBRES, DECLARATIONS, ASSISTANCES, statsAnzrbo, aJour,
-  COTISATIONS, ayantsDroitDe,
+  DECLARATIONS, ASSISTANCES, statsAnzrbo, COTISATIONS,
 } from "@/lib/data";
+import { listMembers } from "@/lib/members.functions";
 
 export const Route = createFileRoute("/admin/")({
   beforeLoad: () => { const r = clientRoleGuard(["admin_anzrbo"]); if (r) throw r; },
@@ -34,12 +36,28 @@ function AdminDashboard() {
   const nav = useNavigate();
   useEffect(() => { if (!loading && (!user || !user.roles.includes("admin_anzrbo"))) nav({ to: "/login" }); }, [user, loading, nav]);
 
-  const s = useMemo(() => statsAnzrbo(), []);
+  const listFn = useServerFn(listMembers);
+  const { data: membersData } = useQuery({
+    queryKey: ["members", "dashboard"],
+    queryFn: () => listFn({ data: { q: "", page: 1, pageSize: 100, statut: "" } }),
+    enabled: !!user,
+    refetchOnWindowFocus: true,
+    staleTime: 15_000,
+  });
+  const MEMBRES_DB: any[] = membersData?.rows ?? [];
+  const totalDb = membersData?.total ?? MEMBRES_DB.length;
+
+  const sDemo = useMemo(() => statsAnzrbo(), []);
+  const actifsDb = MEMBRES_DB.filter((m) => m.statut === "actif").length;
+  const suspendusDb = MEMBRES_DB.filter((m) => m.statut === "suspendu").length;
+  const decedesDb = MEMBRES_DB.filter((m) => m.statut === "decede").length;
+  const s = { ...sDemo, total: totalDb, actifs: actifsDb, suspendus: suspendusDb, decedes: decedesDb };
+
   const repartition = useMemo(() => [
-    { name: "Actifs", value: s.actifs, color: "hsl(142 71% 45%)" },
-    { name: "Suspendus", value: s.suspendus, color: "hsl(38 92% 50%)" },
-    { name: "Décédés", value: s.decedes, color: "hsl(0 72% 51%)" },
-  ], [s]);
+    { name: "Actifs", value: actifsDb, color: "hsl(142 71% 45%)" },
+    { name: "Suspendus", value: suspendusDb, color: "hsl(38 92% 50%)" },
+    { name: "Décédés", value: decedesDb, color: "hsl(0 72% 51%)" },
+  ], [actifsDb, suspendusDb, decedesDb]);
 
   const trend = useMemo(() => {
     const buckets = new Map<string, { mois: string; cotisations: number; assistances: number }>();
@@ -60,14 +78,15 @@ function AdminDashboard() {
 
   const alertesCarence = useMemo(() => {
     const now = new Date();
-    return MEMBRES.filter((m) => {
-      const di = new Date(m.dateInscription);
+    return MEMBRES_DB.filter((m) => {
+      if (!m.date_inscription) return false;
+      const di = new Date(m.date_inscription);
       const diffMonths = (now.getFullYear() - di.getFullYear()) * 12 + (now.getMonth() - di.getMonth());
       return diffMonths < 3;
     });
-  }, []);
+  }, [MEMBRES_DB]);
 
-  const alertesNonAJour = useMemo(() => MEMBRES.filter((m) => m.statut === "actif" && !aJour(m.id)), []);
+  const alertesNonAJour: any[] = [];
   const dossiersEnAttente = useMemo(() => ASSISTANCES.filter((a) => a.statut === "en_attente"), []);
 
   if (loading || !user) return <div className="flex min-h-screen items-center justify-center text-muted-foreground">Chargement…</div>;
@@ -186,9 +205,9 @@ function AdminDashboard() {
         {/* Alertes dynamiques (CDC §6.2) */}
         <section className="grid gap-4 md:grid-cols-3">
           <AlerteBox title="Membres en carence (< 3 mois)" count={alertesCarence.length} variant="warn"
-            items={alertesCarence.map((m) => `${m.prenoms} ${m.nom} — éligible le ${new Date(new Date(m.dateInscription).setMonth(new Date(m.dateInscription).getMonth() + 3)).toLocaleDateString("fr-FR")}`)} />
+            items={alertesCarence.map((m: any) => `${m.prenoms} ${m.nom} — éligible le ${new Date(new Date(m.date_inscription).setMonth(new Date(m.date_inscription).getMonth() + 3)).toLocaleDateString("fr-FR")}`)} />
           <AlerteBox title="Membres avec cotisations non payées" count={alertesNonAJour.length} variant="danger"
-            items={alertesNonAJour.map((m) => `${m.prenoms} ${m.nom} (${m.telephone})`)} />
+            items={alertesNonAJour.map((m: any) => `${m.prenoms} ${m.nom} (${m.telephone})`)} />
           <AlerteBox title="Dossiers d'assistance en attente" count={dossiersEnAttente.length} variant="info"
             items={dossiersEnAttente.map((a) => {
               const d = DECLARATIONS.find((x) => x.id === a.declarationId);
@@ -206,19 +225,22 @@ function AdminDashboard() {
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead className="text-left text-xs uppercase text-muted-foreground">
-                  <tr><th className="py-2">N° Membre</th><th>Nom</th><th>Village</th><th>Statut</th><th>Ayants droit</th><th>À jour</th></tr>
+                  <tr><th className="py-2">N° Membre</th><th>Nom</th><th>Village</th><th>Statut</th><th>Téléphone</th><th>Inscrit le</th></tr>
                 </thead>
                 <tbody>
-                  {MEMBRES.slice(0, 10).map((m) => (
+                  {MEMBRES_DB.slice(0, 10).map((m: any) => (
                     <tr key={m.id} className="border-t">
-                      <td className="py-2 font-mono text-xs">{m.numeroMembre}</td>
+                      <td className="py-2 font-mono text-xs">{m.numero_membre}</td>
                       <td>{m.prenoms} {m.nom}</td>
-                      <td className="text-muted-foreground">{m.village}</td>
+                      <td className="text-muted-foreground">{m.quartier ?? m.ville ?? "—"}</td>
                       <td><StatutBadge statut={m.statut} /></td>
-                      <td>{ayantsDroitDe(m.id).length}</td>
-                      <td>{m.statut === "actif" ? (aJour(m.id) ? <Badge className="bg-emerald-100 text-emerald-700">Oui</Badge> : <Badge className="bg-red-100 text-red-700">Non</Badge>) : "—"}</td>
+                      <td className="font-mono text-xs">{m.telephone}</td>
+                      <td className="text-xs text-muted-foreground">{m.date_inscription ?? "—"}</td>
                     </tr>
                   ))}
+                  {MEMBRES_DB.length === 0 && (
+                    <tr><td colSpan={6} className="py-4 text-center text-muted-foreground">Aucun membre enregistré.</td></tr>
+                  )}
                 </tbody>
               </table>
             </div>

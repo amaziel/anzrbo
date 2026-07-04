@@ -1,7 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { DashboardHeader, ADMIN_NAV } from "@/components/DashboardHeader";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -53,6 +53,7 @@ function ModifierMembre() {
   const getFn = useServerFn(getMember);
   const updateFn = useServerFn(updateMember);
   const uploadFn = useServerFn(uploadFile);
+  const qc = useQueryClient();
   const { data, isLoading, error } = useQuery({ queryKey: ["member-edit", id], queryFn: () => getFn({ data: { id } }), enabled: !!user });
   const member = data?.member;
   const notesObj = useMemo(() => parseNotes(member?.notes ?? null), [member?.notes]);
@@ -98,7 +99,7 @@ function ModifierMembre() {
       let photoUrl = form.photo_url;
       if (photo) {
         step = "upload_photo";
-        const blob = await compressImage(photo, 760, 0.72);
+        const blob = await compressImage(photo, 640, 0.66);
         const f = new File([blob], `photo-${Date.now()}.jpg`, { type: "image/jpeg" });
         const b64 = await fileToBase64(f);
         const path = `${member.id}/${Date.now()}-${form.telephone.replace(/\D/g, "")}.jpg`;
@@ -125,6 +126,9 @@ function ModifierMembre() {
         setTimeout(resolve, 600);
       });
       toast.success("Membre modifié, carte régénérée");
+      qc.invalidateQueries({ queryKey: ["members"] });
+      qc.invalidateQueries({ queryKey: ["member", id] });
+      qc.invalidateQueries({ queryKey: ["member-edit", id] });
       nav({ to: "/admin/membres" });
     } catch (err: any) {
       const message = err?.message ?? String(err) ?? "Erreur inconnue";
