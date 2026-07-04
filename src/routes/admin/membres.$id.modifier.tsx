@@ -126,6 +126,9 @@ function ModifierMembre() {
         setTimeout(resolve, 600);
       });
       toast.success("Membre modifié, carte régénérée");
+      qc.invalidateQueries({ queryKey: ["members"] });
+      qc.invalidateQueries({ queryKey: ["member", id] });
+      qc.invalidateQueries({ queryKey: ["member-edit", id] });
       nav({ to: "/admin/membres" });
     } catch (err: any) {
       const message = err?.message ?? String(err) ?? "Erreur inconnue";
