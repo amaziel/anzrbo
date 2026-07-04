@@ -225,19 +225,22 @@ function AdminDashboard() {
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead className="text-left text-xs uppercase text-muted-foreground">
-                  <tr><th className="py-2">N° Membre</th><th>Nom</th><th>Village</th><th>Statut</th><th>Ayants droit</th><th>À jour</th></tr>
+                  <tr><th className="py-2">N° Membre</th><th>Nom</th><th>Village</th><th>Statut</th><th>Téléphone</th><th>Inscrit le</th></tr>
                 </thead>
                 <tbody>
-                  {MEMBRES.slice(0, 10).map((m) => (
+                  {MEMBRES_DB.slice(0, 10).map((m: any) => (
                     <tr key={m.id} className="border-t">
-                      <td className="py-2 font-mono text-xs">{m.numeroMembre}</td>
+                      <td className="py-2 font-mono text-xs">{m.numero_membre}</td>
                       <td>{m.prenoms} {m.nom}</td>
-                      <td className="text-muted-foreground">{m.village}</td>
+                      <td className="text-muted-foreground">{m.quartier ?? m.ville ?? "—"}</td>
                       <td><StatutBadge statut={m.statut} /></td>
-                      <td>{ayantsDroitDe(m.id).length}</td>
-                      <td>{m.statut === "actif" ? (aJour(m.id) ? <Badge className="bg-emerald-100 text-emerald-700">Oui</Badge> : <Badge className="bg-red-100 text-red-700">Non</Badge>) : "—"}</td>
+                      <td className="font-mono text-xs">{m.telephone}</td>
+                      <td className="text-xs text-muted-foreground">{m.date_inscription ?? "—"}</td>
                     </tr>
                   ))}
+                  {MEMBRES_DB.length === 0 && (
+                    <tr><td colSpan={6} className="py-4 text-center text-muted-foreground">Aucun membre enregistré.</td></tr>
+                  )}
                 </tbody>
               </table>
             </div>
