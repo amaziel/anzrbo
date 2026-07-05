@@ -1,10 +1,13 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useEffect, useMemo } from "react";
+import { useEffect } from "react";
+import { useServerFn } from "@tanstack/react-start";
+import { useQuery } from "@tanstack/react-query";
 import { DashboardHeader, DIGITORG_NAV } from "@/components/DashboardHeader";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useAuth, clientRoleGuard } from "@/lib/auth";
-import { MEMBRES, FRAIS_INSCRIPTION_DIGITORG, statsAnzrbo } from "@/lib/data";
+import { FRAIS_INSCRIPTION_DIGITORG } from "@/lib/data";
+import { getMemberStats } from "@/lib/members.functions";
 import { Building2, Sparkles, Wallet, Users, ArrowUpRight } from "lucide-react";
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 
@@ -21,19 +24,12 @@ function DigitOrgDashboard() {
   const { user, loading } = useAuth();
   const nav = useNavigate();
   useEffect(() => { if (!loading && (!user || !user.roles.includes("digitorg"))) nav({ to: "/login" }); }, [user, loading, nav]);
-  const s = useMemo(() => statsAnzrbo(), []);
+  const statsFn = useServerFn(getMemberStats);
+  const { data: s } = useQuery({ queryKey: ["member-stats", "digitorg"], queryFn: () => statsFn(), enabled: !!user, refetchOnWindowFocus: true });
 
-  const trend = useMemo(() => {
-    const months = ["Juin", "Juil", "Août", "Sept", "Oct", "Nov", "Déc", "Jan", "Fév", "Mar", "Avr", "Mai"];
-    const buckets = new Map<string, { mois: string; inscriptions: number; frais: number }>();
-    months.forEach((m) => buckets.set(m, { mois: m, inscriptions: 0, frais: 0 }));
-    MEMBRES.forEach((m) => {
-      const d = new Date(m.dateInscription);
-      const k = months[d.getMonth()] ?? "Jan";
-      const b = buckets.get(k); if (b) { b.inscriptions += 1; b.frais += FRAIS_INSCRIPTION_DIGITORG; }
-    });
-    return Array.from(buckets.values());
-  }, []);
+  const trend = s?.trend ?? [];
+  const total = s?.total ?? 0;
+  const frais = s?.fraisInscription ?? 0;
 
   if (loading || !user) return <div className="flex min-h-screen items-center justify-center text-muted-foreground">Chargement…</div>;
 
@@ -57,8 +53,8 @@ function DigitOrgDashboard() {
         </section>
 
         <section className="grid grid-cols-2 gap-4 md:grid-cols-4">
-          <KPI icon={Users} label="Membres inscrits" value={s.total} gradient="from-blue-500 to-indigo-600" />
-          <KPI icon={Wallet} label="Frais d'inscription perçus" value={`${s.fraisInscription.toLocaleString("fr-FR")} F`} gradient="from-emerald-500 to-green-600" trend={`${FRAIS_INSCRIPTION_DIGITORG.toLocaleString("fr-FR")} F / membre`} />
+          <KPI icon={Users} label="Membres inscrits" value={total} gradient="from-blue-500 to-indigo-600" />
+          <KPI icon={Wallet} label="Frais d'inscription perçus" value={`${frais.toLocaleString("fr-FR")} F`} gradient="from-emerald-500 to-green-600" trend={`${FRAIS_INSCRIPTION_DIGITORG.toLocaleString("fr-FR")} F / membre`} />
           <KPI icon={Building2} label="Tarif unitaire" value={`${FRAIS_INSCRIPTION_DIGITORG.toLocaleString("fr-FR")} F`} gradient="from-purple-500 to-pink-600" />
           <KPI icon={Wallet} label="Part cotisations / NSIA" value="0 F" gradient="from-slate-500 to-slate-700" trend="Aucune commission" />
         </section>
