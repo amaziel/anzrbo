@@ -83,6 +83,36 @@ function createPublicSupabaseClient() {
   }) as any;
 }
 
+function normalizeDigits(v?: string | null) {
+  return String(v ?? "").replace(/\D/g, "");
+}
+
+function normalizeText(v?: string | null) {
+  return String(v ?? "").trim().toLowerCase();
+}
+
+function memberMatchesSearch(m: any, rawSearch: string) {
+  const s = normalizeText(rawSearch);
+  const digits = normalizeDigits(rawSearch);
+  const textFields = [m.numero_membre, m.matricule, m.nom, m.prenoms, m.telephone, m.contact2, m.ville, m.quartier, m.adresse]
+    .map(normalizeText);
+  const digitFields = [m.telephone, m.contact2, m.numero_membre, m.matricule].map(normalizeDigits);
+  return textFields.some((v) => v.includes(s)) || (!!digits && digitFields.some((v) => v.includes(digits)));
+}
+
+function safeQrOrigin() {
+  return (process.env.PUBLIC_SITE_URL ?? "https://anzrbo1.lovable.app").replace(/\/$/, "");
+}
+
+function buildVerifierPayload(member: { numero_membre: string; telephone?: string | null; contact2?: string | null; updated_at?: string | null }) {
+  const version = encodeURIComponent(String(member.updated_at ?? Date.now()));
+  const t = normalizeDigits(member.telephone);
+  const c = normalizeDigits(member.contact2);
+  const params = new URLSearchParams({ v: version });
+  if (t && !/^0+$/.test(t)) params.set("t", t);
+  if (c && !/^0+$/.test(c)) params.set("c", c);
+  return `${safeQrOrigin()}/verifier/${encodeURIComponent(member.numero_membre)}?${params.toString()}`;
+}
 
 function genNumero() {
   const y = new Date().getFullYear();
@@ -104,17 +134,24 @@ export const listMembers = createServerFn({ method: "POST" })
     const db = await getTrustedDbClient(context);
     const from = (data.page - 1) * data.pageSize;
     const to = from + data.pageSize - 1;
+    if (data.q) {
+      const { data: allRows, error: allError } = await db
+        .from("members")
+        .select("*")
+        .order("updated_at", { ascending: false })
+        .limit(1500);
+      if (allError) throw new Error(allError.message);
+      let filtered = (allRows ?? []).filter((m: any) => memberMatchesSearch(m, data.q));
+      if (data.statut) filtered = filtered.filter((m: any) => m.statut === data.statut);
+      const paged = filtered.slice(from, from + data.pageSize);
+      return { rows: paged as MemberRow[], total: filtered.length, page: data.page, pageSize: data.pageSize };
+    }
+
     let q = db
       .from("members")
       .select("*", { count: "exact" })
       .order("created_at", { ascending: false })
       .range(from, to);
-    if (data.q) {
-      const s = `%${data.q}%`;
-      q = q.or(
-        `nom.ilike.${s},prenoms.ilike.${s},telephone.ilike.${s},numero_membre.ilike.${s},ville.ilike.${s},quartier.ilike.${s}`,
-      );
-    }
     if (data.statut) q = q.eq("statut", data.statut);
     const { data: rows, count, error } = await q;
     if (error) throw new Error(error.message);
@@ -187,18 +224,18 @@ function canUseInlineFallback(bucket: string, contentType: string, bytes: number
     && (contentType.startsWith("image/") || contentType === "application/pdf");
 }
 
-async function regenerateMemberCard(db: any, memberId: string, numeroMembre: string, userId: string) {
+async function regenerateMemberCard(db: any, member: Pick<MemberRow, "id" | "numero_membre" | "telephone" | "contact2" | "updated_at">, userId: string) {
   const { data: latest } = await db
     .from("member_cards")
     .select("version")
-    .eq("member_id", memberId)
+    .eq("member_id", member.id)
     .order("version", { ascending: false })
     .limit(1);
   const version = ((latest?.[0]?.version as number | undefined) ?? 0) + 1;
-  await db.from("member_cards").update({ active: false }).eq("member_id", memberId);
-  const qrPayload = `${process.env.PUBLIC_SITE_URL ?? "https://anzrbo1.lovable.app"}/verifier/${encodeURIComponent(numeroMembre)}`;
+  await db.from("member_cards").update({ active: false }).eq("member_id", member.id);
+  const qrPayload = buildVerifierPayload(member);
   const { error } = await db.from("member_cards").insert({
-    member_id: memberId,
+    member_id: member.id,
     version,
     qr_payload: qrPayload,
     active: true,
@@ -324,7 +361,7 @@ export const createMember = createServerFn({ method: "POST" })
       .eq("active", true)
       .then(async ({ count: cardCount }: any) => {
         if ((cardCount ?? 0) === 0) {
-          const qrPayload = `${process.env.PUBLIC_SITE_URL ?? "https://anzrbo1.lovable.app"}/verifier/${encodeURIComponent(numero)}`;
+          const qrPayload = buildVerifierPayload(m);
           const { error: cardError } = await db.from("member_cards").insert({
             member_id: m.id, version: 1, qr_payload: qrPayload, active: true, created_by: context.userId,
           });
@@ -367,12 +404,95 @@ export const updateMember = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     await assertAnzrboAdmin(context.supabase, context.userId);
     const db = await getTrustedDbClient(context);
-    const { error } = await db.from("members").update({
+    const nextUpdatedAt = new Date().toISOString();
+    const { data: updated, error } = await db.from("members").update({
       ...data.patch,
-      updated_at: new Date().toISOString(),
-    }).eq("id", data.id);
+      updated_at: nextUpdatedAt,
+    }).eq("id", data.id).select("id,numero_membre,telephone,contact2,updated_at").single();
     if (error) throw detailedSupabaseError("Modification membre", error);
+    if (updated && ("telephone" in data.patch || "contact2" in data.patch || "numero_membre" in data.patch)) {
+      await regenerateMemberCard(db, updated as any, context.userId);
+    }
     return { ok: true };
+  });
+
+export const listPaiements = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: { type?: string; limit?: number } = {}) => ({
+    type: data.type ?? "",
+    limit: Math.min(1000, Math.max(10, data.limit ?? 300)),
+  }))
+  .handler(async ({ data, context }) => {
+    await assertAnzrboAdmin(context.supabase, context.userId);
+    const db = await getTrustedDbClient(context);
+    let q = db
+      .from("paiements")
+      .select("*, members(id,numero_membre,nom,prenoms,telephone,contact2,statut,photo_url,ville,quartier,date_inscription)")
+      .order("created_at", { ascending: false })
+      .limit(data.limit);
+    if (data.type) q = q.eq("type", normalizePaiementType(data.type));
+    const { data: rows, error } = await q;
+    if (error) throw detailedSupabaseError("Paiements", error);
+    return { rows: rows ?? [] };
+  });
+
+export const listNsiaSubscriptions = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    await assertAnzrboAdmin(context.supabase, context.userId);
+    const db = await getTrustedDbClient(context);
+    const { data: rows, error } = await db
+      .from("paiements")
+      .select("*, members(id,numero_membre,nom,prenoms,telephone,contact2,statut,ville,quartier)")
+      .eq("type", "nsia")
+      .order("created_at", { ascending: false })
+      .limit(1000);
+    if (error) throw detailedSupabaseError("Souscriptions NSIA", error);
+    return { rows: rows ?? [] };
+  });
+
+export const createNsiaSubscription = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((data: { member_id: string; formule: number; benefice: number; cotisationUnitaire: number; nbPersonnes: number; dateSouscription: string }) => {
+    if (!data?.member_id) throw new Error("Membre requis");
+    if (!Number.isFinite(data.formule) || data.formule < 1) throw new Error("Formule invalide");
+    if (!Number.isFinite(data.nbPersonnes) || data.nbPersonnes < 1) throw new Error("Nombre de personnes invalide");
+    return data;
+  })
+  .handler(async ({ data, context }) => {
+    await assertAnzrboAdmin(context.supabase, context.userId);
+    const db = await getTrustedDbClient(context);
+    const { data: existing } = await db
+      .from("paiements")
+      .select("id")
+      .eq("member_id", data.member_id)
+      .eq("type", "nsia")
+      .limit(1)
+      .maybeSingle();
+    if (existing) return { ok: true, duplicate: true, paiement: existing };
+    const cotisationAnnuelle = data.cotisationUnitaire * data.nbPersonnes;
+    const { data: row, error } = await db.from("paiements").insert({
+      member_id: data.member_id,
+      type: "nsia",
+      montant: cotisationAnnuelle,
+      statut: "paye",
+      methode: "especes",
+      periode: String(new Date(data.dateSouscription).getFullYear()),
+      paye_le: new Date(data.dateSouscription).toISOString(),
+      encaisse_par: context.userId,
+      notes: JSON.stringify({
+        nsia: true,
+        formule: data.formule,
+        benefice: data.benefice,
+        cotisationUnitaire: data.cotisationUnitaire,
+        nbPersonnes: data.nbPersonnes,
+        cotisationAnnuelle,
+        dateSouscription: data.dateSouscription,
+        actif: true,
+      }),
+    }).select("*").single();
+    if (error) throw detailedSupabaseError("Souscription NSIA", error);
+    return { ok: true, paiement: row };
   });
 
 export const deleteMember = createServerFn({ method: "POST" })
@@ -440,7 +560,7 @@ export const verifyMemberPublic = createServerFn({ method: "POST" })
     } catch { /* QR texte classique */ }
     const match = raw.match(/(?:\/m\/|\/verifier\/)([^/?#]+)/i);
     if (match) raw = decodeURIComponent(match[1]);
-    const digits = raw.replace(/\D/g, "");
+    const digits = normalizeDigits(raw);
     let query = db
       .from("members")
       .select("id,numero_membre,photo_url,nom,prenoms,telephone,contact2,ville,quartier,adresse,date_naissance,lieu_naissance,date_inscription,statut")
@@ -448,14 +568,22 @@ export const verifyMemberPublic = createServerFn({ method: "POST" })
     if (digits && digits.length >= 8) {
       const pat = `%${digits}%`;
       query = query.or(
-        `telephone.eq.${digits},contact2.eq.${digits},telephone.eq.${raw},contact2.eq.${raw},telephone.ilike.${pat},contact2.ilike.${pat},numero_membre.ilike.%${raw}%`,
+        `telephone.eq.${digits},contact2.eq.${digits},telephone.eq.${raw},contact2.eq.${raw},telephone.ilike.${pat},contact2.ilike.${pat},numero_membre.ilike.%${raw}%,matricule.ilike.%${raw}%`,
       );
     } else {
-      query = query.or(`numero_membre.eq.${raw},numero_membre.ilike.%${raw}%`);
+      query = query.or(`numero_membre.eq.${raw},numero_membre.ilike.%${raw}%,matricule.eq.${raw},matricule.ilike.%${raw}%,nom.ilike.%${raw}%,prenoms.ilike.%${raw}%`);
     }
     const { data: rows, error } = await query;
     if (error) throw new Error(error.message);
-    return { member: rows?.[0] ?? null };
+    if (rows?.[0]) return { member: rows[0] };
+
+    const { data: fallbackRows, error: fallbackError } = await db
+      .from("members")
+      .select("id,numero_membre,matricule,photo_url,nom,prenoms,telephone,contact2,ville,quartier,adresse,date_naissance,lieu_naissance,date_inscription,statut,updated_at")
+      .order("updated_at", { ascending: false })
+      .limit(1500);
+    if (fallbackError) throw new Error(fallbackError.message);
+    return { member: (fallbackRows ?? []).find((m: any) => memberMatchesSearch(m, raw)) ?? null };
   });
 
 /** Upload binaire base64 dans un bucket storage (admin). */
