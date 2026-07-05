@@ -1,11 +1,14 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect } from "react";
+import { useServerFn } from "@tanstack/react-start";
+import { useQuery } from "@tanstack/react-query";
 import { DashboardHeader, ADMIN_NAV } from "@/components/DashboardHeader";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useAuth, clientRoleGuard } from "@/lib/auth";
-import { ASSISTANCES, DECLARATIONS, ASSISTANCE_ANZRBO, PAIEMENTS_NSIA } from "@/lib/data";
+import { ASSISTANCE_ANZRBO } from "@/lib/data";
+import { listMembers, listPaiements } from "@/lib/members.functions";
 import { HandCoins, CheckCircle2, XCircle, Clock } from "lucide-react";
 
 export const Route = createFileRoute("/admin/assistances")({
@@ -24,12 +27,16 @@ function Page() {
   const { user, loading } = useAuth();
   const nav = useNavigate();
   useEffect(() => { if (!loading && (!user || user.role !== "admin_anzrbo")) nav({ to: "/login" }); }, [user, loading, nav]);
+  const listMembersFn = useServerFn(listMembers);
+  const listPaiementsFn = useServerFn(listPaiements);
+  const { data: membersData, isLoading: loadingMembers } = useQuery({ queryKey: ["members", "assistances"], queryFn: () => listMembersFn({ data: { q: "", page: 1, pageSize: 100, statut: "" } }), enabled: !!user, refetchOnWindowFocus: true });
+  const { data: assistData } = useQuery({ queryKey: ["paiements", "assistance"], queryFn: () => listPaiementsFn({ data: { type: "assistance", limit: 1000 } }), enabled: !!user, refetchOnWindowFocus: true });
 
   if (loading || !user) return <div className="flex min-h-screen items-center justify-center">Chargement…</div>;
 
-  const versees = ASSISTANCES.filter((a) => a.statut === "versee");
-  const refusees = ASSISTANCES.filter((a) => a.statut === "refusee");
-  const enAttente = ASSISTANCES.filter((a) => a.statut === "en_attente");
+  const versees = assistData?.rows ?? [];
+  const refusees: any[] = [];
+  const enAttente = (membersData?.rows ?? []).filter((m: any) => m.statut === "actif" && !versees.some((p: any) => p.member_id === m.id));
 
   return (
     <div className="min-h-screen bg-muted/30">
@@ -58,24 +65,23 @@ function Page() {
                 <TableHead>NSIA</TableHead><TableHead>Motif refus</TableHead>
               </TableRow></TableHeader>
               <TableBody>
-                {ASSISTANCES.map((a) => {
-                  const d = DECLARATIONS.find((x) => x.id === a.declarationId)!;
-                  const nsia = PAIEMENTS_NSIA.find((p) => p.declarationId === a.declarationId);
+                {loadingMembers && <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground">Chargement DB…</TableCell></TableRow>}
+                {versees.map((a: any) => {
+                  const m = a.members;
                   return (
                     <TableRow key={a.id}>
-                      <TableCell className="font-medium">{d.nomDefunt}</TableCell>
-                      <TableCell>{d.defuntType === "principal" ? "Membre" : "Ayant droit"}</TableCell>
-                      <TableCell>{new Date(d.dateDeces).toLocaleDateString("fr-FR")}</TableCell>
-                      <TableCell>{a.beneficiaire}</TableCell>
-                      <TableCell className="font-semibold">{a.montant.toLocaleString("fr-FR")} F</TableCell>
-                      <TableCell><StatutBadge s={a.statut} /></TableCell>
-                      <TableCell>
-                        {nsia ? <span className="text-xs">+{nsia.netFamille.toLocaleString("fr-FR")} F (NSIA)<br/>Commission assoc : {nsia.commissionAssoc.toLocaleString("fr-FR")} F</span> : <span className="text-muted-foreground">—</span>}
-                      </TableCell>
-                      <TableCell className="text-xs text-muted-foreground">{a.motifRefus || "—"}</TableCell>
+                      <TableCell className="font-medium">{m?.prenoms} {m?.nom}</TableCell>
+                      <TableCell>Membre</TableCell>
+                      <TableCell>{new Date(a.paye_le ?? a.created_at).toLocaleDateString("fr-FR")}</TableCell>
+                      <TableCell>{m?.prenoms} {m?.nom}</TableCell>
+                      <TableCell className="font-semibold">{Number(a.montant ?? ASSISTANCE_ANZRBO).toLocaleString("fr-FR")} F</TableCell>
+                      <TableCell><StatutBadge s="versee" /></TableCell>
+                      <TableCell><span className="text-muted-foreground">—</span></TableCell>
+                      <TableCell className="text-xs text-muted-foreground">—</TableCell>
                     </TableRow>
                   );
                 })}
+                {versees.length === 0 && <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground">Aucune assistance versée enregistrée. Les membres actifs sont bien lus depuis la base : {enAttente.length} dossier(s) potentiel(s).</TableCell></TableRow>}
               </TableBody>
             </Table>
           </CardContent>

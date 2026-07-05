@@ -45,8 +45,10 @@ function Page() {
       .finally(() => { if (alive) setLoading(false); });
     load();
     const onFocus = () => load();
+    const onDraftRestored = () => load();
     window.addEventListener("focus", onFocus);
-    return () => { alive = false; window.removeEventListener("focus", onFocus); };
+    window.addEventListener("anzrbo:draft-restored", onDraftRestored);
+    return () => { alive = false; window.removeEventListener("focus", onFocus); window.removeEventListener("anzrbo:draft-restored", onDraftRestored); };
   }, [raw]);
   useEffect(() => {
     if (!loading && row && typeof window !== "undefined" && new URLSearchParams(window.location.search).get("print") === "1") {

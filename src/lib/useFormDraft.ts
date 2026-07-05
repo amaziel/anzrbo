@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
 /**
@@ -14,6 +15,7 @@ export function useFormDraft<T extends object>(
   restore: (v: T) => void,
   opts: { silent?: boolean; label?: string } = {},
 ) {
+  const queryClient = useQueryClient();
   const restoredRef = useRef(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -27,9 +29,11 @@ export function useFormDraft<T extends object>(
         const parsed = JSON.parse(raw);
         if (parsed && typeof parsed === "object") {
           restore(parsed as T);
+          void queryClient.invalidateQueries();
+          window.dispatchEvent(new CustomEvent("anzrbo:draft-restored", { detail: { key } }));
           if (!opts.silent) {
             toast.success(opts.label ?? "Brouillon restauré", {
-              description: "Reprise automatique du formulaire après interruption.",
+              description: "Données reprises automatiquement. Les tableaux et cartes sont resynchronisés avec la base.",
             });
           }
         }
@@ -38,7 +42,7 @@ export function useFormDraft<T extends object>(
       console.warn("[form-draft] restore failed", key, e);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [key]);
+  }, [key, queryClient]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;

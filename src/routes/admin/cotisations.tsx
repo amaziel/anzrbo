@@ -1,11 +1,14 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo } from "react";
+import { useServerFn } from "@tanstack/react-start";
+import { useQuery } from "@tanstack/react-query";
 import { DashboardHeader, ADMIN_NAV } from "@/components/DashboardHeader";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useAuth, clientRoleGuard } from "@/lib/auth";
-import { COTISATIONS, DECLARATIONS, MEMBRES, COTISATION_PAR_DECES, membre } from "@/lib/data";
+import { COTISATION_PAR_DECES } from "@/lib/data";
+import { listMembers, listPaiements } from "@/lib/members.functions";
 import { Wallet, AlertTriangle } from "lucide-react";
 
 export const Route = createFileRoute("/admin/cotisations")({
@@ -18,17 +21,37 @@ function Page() {
   const { user, loading } = useAuth();
   const nav = useNavigate();
   useEffect(() => { if (!loading && (!user || user.role !== "admin_anzrbo")) nav({ to: "/login" }); }, [user, loading, nav]);
+  const listMembersFn = useServerFn(listMembers);
+  const listPaiementsFn = useServerFn(listPaiements);
+  const { data: membersData, isLoading: loadingMembers } = useQuery({
+    queryKey: ["members", "cotisations"],
+    queryFn: () => listMembersFn({ data: { q: "", page: 1, pageSize: 100, statut: "" } }),
+    enabled: !!user,
+    refetchOnWindowFocus: true,
+  });
+  const { data: payData, isLoading: loadingPayments } = useQuery({
+    queryKey: ["paiements", "cotisation"],
+    queryFn: () => listPaiementsFn({ data: { type: "cotisation", limit: 1000 } }),
+    enabled: !!user,
+    refetchOnWindowFocus: true,
+  });
 
-  const parDecl = useMemo(() => DECLARATIONS.map((d) => {
-    const cs = COTISATIONS.filter((c) => c.declarationId === d.id);
-    return {
-      d, total: cs.length, payees: cs.filter((c) => c.statut === "payee").length,
-      retard: cs.filter((c) => c.statut === "en_retard").length,
-      collecte: cs.filter((c) => c.statut === "payee").reduce((s, c) => s + c.montant, 0),
-    };
-  }), []);
+  const rows = payData?.rows ?? [];
+  const members = membersData?.rows ?? [];
+  const payees = rows.length;
+  const collecte = rows.reduce((s: number, p: any) => s + (Number(p.montant) || 0), 0);
+  const enRetard = useMemo(() => members.filter((m: any) => m.statut === "actif" && !rows.some((p: any) => p.member_id === m.id)), [members, rows]);
 
-  const enRetard = useMemo(() => COTISATIONS.filter((c) => c.statut !== "payee"), []);
+  const parDecl = useMemo(() => [{
+    id: "global",
+    nom: "Cotisations décès — registre DB",
+    date: new Date().toISOString(),
+    total: members.filter((m: any) => m.statut === "actif").length,
+    payees,
+    retard: enRetard.length,
+    collecte,
+  }], [members, payees, enRetard.length, collecte]);
+
   if (loading || !user) return <div className="flex min-h-screen items-center justify-center">Chargement…</div>;
 
   return (
@@ -37,7 +60,7 @@ function Page() {
       <main className="container mx-auto max-w-7xl space-y-6 px-4 py-8">
         <div className="grid gap-4 md:grid-cols-3">
           <Stat icon={Wallet} label="Cotisation par décès" value={`${COTISATION_PAR_DECES.toLocaleString("fr-FR")} F`} />
-          <Stat icon={Wallet} label="Cotisations payées" value={COTISATIONS.filter((c) => c.statut === "payee").length} />
+          <Stat icon={Wallet} label="Cotisations payées" value={payees} />
           <Stat icon={AlertTriangle} label="Cotisations en retard" value={enRetard.length} warn />
         </div>
 
@@ -55,11 +78,12 @@ function Page() {
                 <TableHead>Collecté</TableHead>
               </TableRow></TableHeader>
               <TableBody>
-                {parDecl.map(({ d, total, payees, retard, collecte }) => (
-                  <TableRow key={d.id}>
-                    <TableCell>{d.nomDefunt}</TableCell>
-                    <TableCell>{new Date(d.dateDeces).toLocaleDateString("fr-FR")}</TableCell>
-                    <TableCell>{d.defuntType === "principal" ? "Membre principal" : "Ayant droit"}</TableCell>
+                {(loadingMembers || loadingPayments) && <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground">Chargement DB…</TableCell></TableRow>}
+                {parDecl.map(({ id, nom, date, total, payees, retard, collecte }) => (
+                  <TableRow key={id}>
+                    <TableCell>{nom}</TableCell>
+                    <TableCell>{new Date(date).toLocaleDateString("fr-FR")}</TableCell>
+                    <TableCell>Cotisations membres actifs</TableCell>
                     <TableCell>{total}</TableCell>
                     <TableCell><Badge className="bg-emerald-100 text-emerald-700">{payees}</Badge></TableCell>
                     <TableCell>{retard > 0 ? <Badge className="bg-red-100 text-red-700">{retard}</Badge> : <span className="text-muted-foreground">0</span>}</TableCell>
@@ -80,15 +104,13 @@ function Page() {
                 <TableHead>Décès concerné</TableHead><TableHead>Montant dû</TableHead>
               </TableRow></TableHeader>
               <TableBody>
-                {enRetard.map((c) => {
-                  const m = membre(c.membreId)!;
-                  const d = DECLARATIONS.find((x) => x.id === c.declarationId)!;
+                {enRetard.map((m: any) => {
                   return (
-                    <TableRow key={c.id}>
+                    <TableRow key={m.id}>
                       <TableCell>{m.prenoms} {m.nom}</TableCell>
                       <TableCell className="text-muted-foreground">{m.telephone}</TableCell>
-                      <TableCell>{d.nomDefunt} ({new Date(d.dateDeces).toLocaleDateString("fr-FR")})</TableCell>
-                      <TableCell className="font-semibold text-red-600">{c.montant.toLocaleString("fr-FR")} F</TableCell>
+                      <TableCell>Cotisation décès non encore enregistrée</TableCell>
+                      <TableCell className="font-semibold text-red-600">{COTISATION_PAR_DECES.toLocaleString("fr-FR")} F</TableCell>
                     </TableRow>
                   );
                 })}

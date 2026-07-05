@@ -11,10 +11,20 @@ import type { Membre } from "@/lib/data";
 const CARD_W = "85.6mm";
 const CARD_H = "53.98mm";
 
-function fullVerifierUrl(numeroMembre: string) {
+function fullVerifierUrl(numeroMembre: string, m?: Partial<Membre>) {
   const origin =
     typeof window !== "undefined" ? window.location.origin : "https://anzrbo.digitorg.net";
-  return `${origin}/verifier/${encodeURIComponent(numeroMembre)}`;
+  const params = new URLSearchParams();
+  const tel = String(m?.telephone ?? "").replace(/\D/g, "");
+  const tel2 = String(m?.contact2 ?? "").replace(/\D/g, "");
+  if (tel && !/^0+$/.test(tel)) params.set("t", tel);
+  if (tel2 && !/^0+$/.test(tel2)) params.set("c", tel2);
+  params.set("v", String(m?.dateInscription ?? Date.now()));
+  return `${origin}/verifier/${encodeURIComponent(numeroMembre)}?${params.toString()}`;
+}
+
+function qrCacheKey(m: Membre) {
+  return [m.numeroMembre, m.telephone, m.contact2, m.dateInscription, m.photoUrl].filter(Boolean).join("|");
 }
 
 function formatDateFr(iso: string) {
@@ -39,11 +49,12 @@ function photoFor(m: Membre) {
 }
 
 const QR_CACHE = new Map<string, string>();
-export function useMemberQr(numeroMembre: string) {
-  const url = fullVerifierUrl(numeroMembre);
-  const [dataUrl, setDataUrl] = useState<string>(() => QR_CACHE.get(url) ?? "");
+export function useMemberQr(numeroMembre: string, cacheKey = numeroMembre, member?: Partial<Membre>) {
+  const url = fullVerifierUrl(numeroMembre, member);
+  const key = `${url}|${cacheKey}`;
+  const [dataUrl, setDataUrl] = useState<string>(() => QR_CACHE.get(key) ?? "");
   useEffect(() => {
-    const cached = QR_CACHE.get(url);
+    const cached = QR_CACHE.get(key);
     if (cached) { setDataUrl(cached); return; }
     let cancelled = false;
     QRCode.toDataURL(url, {
@@ -53,15 +64,15 @@ export function useMemberQr(numeroMembre: string) {
       scale: 8,
       color: { dark: "#0a3d1f", light: "#ffffff" },
     })
-      .then((d) => { if (!cancelled) { QR_CACHE.set(url, d); setDataUrl(d); } })
+      .then((d) => { if (!cancelled) { QR_CACHE.set(key, d); setDataUrl(d); } })
       .catch(() => {});
     return () => { cancelled = true; };
-  }, [url]);
+  }, [key, url]);
   return dataUrl;
 }
 
 export function MemberCardRecto({ m }: { m: Membre }) {
-  const qr = useMemberQr(m.numeroMembre);
+  const qr = useMemberQr(m.numeroMembre, qrCacheKey(m), m);
   return (
     <div
       className="card-anzrbo relative overflow-hidden rounded-[3mm] bg-white text-[#1a1a1a] shadow-[0_8px_24px_-12px_rgba(0,0,0,0.35)]"
@@ -164,7 +175,7 @@ export function MemberCardRecto({ m }: { m: Membre }) {
       <div className="absolute bottom-[4mm] left-[3mm] z-10 text-[2.3mm] font-extrabold tracking-[0.25em] text-white">
         ANZRBO
       </div>
-      <div className="absolute bottom-[4mm] right-[3mm] z-10 flex items-center gap-[1mm] text-[1.8mm] font-bold tracking-wider text-white">
+      <div className="absolute bottom-[5mm] right-[7mm] z-10 flex items-center gap-[0.8mm] text-[1.7mm] font-bold tracking-wider text-white">
         CARTE DE MEMBRE
         <svg width="3.5mm" height="3.5mm" viewBox="0 0 24 24" fill="none" stroke="#c9a24c" strokeWidth="2.5"><path d="M12 2 4 6v6c0 5 3.5 9 8 10 4.5-1 8-5 8-10V6l-8-4z"/></svg>
       </div>
@@ -207,10 +218,10 @@ export function MemberCardVerso({ m }: { m: Membre }) {
       </div>
 
       <div className="absolute bottom-[7mm] left-[3mm] right-[3mm] grid grid-cols-[1fr_1fr] gap-[2mm]">
-        <div className="rounded-[1mm] border border-[#c9a24c] px-[2mm] py-[1.2mm]">
+        <div className="flex flex-col items-center justify-center rounded-[1mm] border border-[#c9a24c] px-[2mm] py-[1.2mm] text-center">
           <div className="text-[1.7mm] font-bold text-[#0c5b2e]">Contacts ANZRBO</div>
-          <div className="font-mono text-[1.9mm] font-bold text-[#1a1a1a]">+225 07 78 81 77 84</div>
-          <div className="font-mono text-[1.9mm] font-bold text-[#1a1a1a]">+225 07 07 17 56 32</div>
+          <div className="font-mono text-[1.9mm] font-bold leading-tight text-[#1a1a1a]">+225 07 78 81 77 84</div>
+          <div className="font-mono text-[1.9mm] font-bold leading-tight text-[#1a1a1a]">+225 07 07 17 56 32</div>
         </div>
         <ul className="space-y-[0.4mm] text-[1.6mm]">
           <li>✓ Carte strictement personnelle.</li>

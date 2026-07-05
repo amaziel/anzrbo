@@ -1,5 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
+import jsQR from "jsqr";
 import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
 import { Card, CardContent } from "@/components/ui/card";
@@ -46,12 +47,52 @@ function Page() {
   const [active, setActive] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const scannerRef = useRef<{ stop: () => Promise<void>; clear: () => void } | null>(null);
+  const fallbackRef = useRef<{ stop: () => void } | null>(null);
+  const navigatingRef = useRef(false);
 
   useEffect(() => {
     return () => {
+      fallbackRef.current?.stop();
       scannerRef.current?.stop().catch(() => {}).finally(() => scannerRef.current?.clear?.());
     };
   }, []);
+
+  function go(decoded: string) {
+    const id = parseTelephone(decoded);
+    if (!id || navigatingRef.current) return;
+    navigatingRef.current = true;
+    fallbackRef.current?.stop();
+    scannerRef.current?.stop().catch(() => {}).finally(() => {
+      nav({ to: "/verifier/$telephone", params: { telephone: id } });
+    });
+  }
+
+  function startJsQrFallback() {
+    let cancelled = false;
+    const canvas = document.createElement("canvas");
+    const ctx = canvas.getContext("2d", { willReadFrequently: true });
+    let last = 0;
+    const tick = (now: number) => {
+      if (cancelled || navigatingRef.current) return;
+      if (now - last < 140) { requestAnimationFrame(tick); return; }
+      last = now;
+      const video = document.querySelector<HTMLVideoElement>("#qr-reader video");
+      if (video && ctx && video.readyState >= 2 && video.videoWidth > 0) {
+        const size = Math.min(video.videoWidth, video.videoHeight);
+        const sx = Math.max(0, (video.videoWidth - size) / 2);
+        const sy = Math.max(0, (video.videoHeight - size) / 2);
+        canvas.width = Math.min(900, size);
+        canvas.height = Math.min(900, size);
+        ctx.drawImage(video, sx, sy, size, size, 0, 0, canvas.width, canvas.height);
+        const img = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const code = jsQR(img.data, img.width, img.height, { inversionAttempts: "attemptBoth" });
+        if (code?.data) { go(code.data); return; }
+      }
+      requestAnimationFrame(tick);
+    };
+    fallbackRef.current = { stop: () => { cancelled = true; } };
+    requestAnimationFrame(tick);
+  }
 
   async function startCamera() {
     setError(null);
@@ -79,14 +120,10 @@ function Page() {
             advanced: [{ focusMode: "continuous" }, { zoom: 1.5 } as any],
           },
         } as any,
-        (decoded) => {
-          const id = parseTelephone(decoded);
-          if (id) {
-            html5.stop().then(() => nav({ to: "/verifier/$telephone", params: { telephone: id } }));
-          }
-        },
+        (decoded) => go(decoded),
         () => {},
       );
+      startJsQrFallback();
       setActive(true);
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : "Impossible d'accéder à la caméra.";

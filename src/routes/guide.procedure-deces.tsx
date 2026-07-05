@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { ArrowLeft, CheckCircle2, FileCheck2, HandCoins, ShieldCheck, Users } from "lucide-react";
+import { ArrowLeft, AlertTriangle, CheckCircle2, Clock, FileCheck2, HandCoins, PhoneCall, ShieldCheck, Users } from "lucide-react";
 
 import { SiteFooter } from "@/components/SiteFooter";
 import { SiteHeader } from "@/components/SiteHeader";
@@ -34,6 +34,22 @@ const steps = [
     text: "ANZRBO prépare l'assistance de 500 000 FCFA. Si une souscription NSIA Décès existe, le dossier partenaire est transmis et suivi jusqu'au règlement.",
     icon: CheckCircle2,
   },
+];
+
+const pieces = [
+  "Numéro de membre ANZRBO ou contact téléphonique du membre principal",
+  "Nom complet du défunt et lien avec le membre principal",
+  "Date et lieu du décès",
+  "Pièce ou déclaration officielle disponible",
+  "Contact familial joignable pour le suivi du dossier",
+  "Preuves de paiement des cotisations appelées, si disponibles",
+];
+
+const checkpoints = [
+  { label: "Signalement", value: "Immédiat", icon: PhoneCall },
+  { label: "Vérification", value: "Même jour", icon: ShieldCheck },
+  { label: "Cotisation", value: "Après validation", icon: HandCoins },
+  { label: "Assistance", value: "Dossier complet", icon: CheckCircle2 },
 ];
 
 export const Route = createFileRoute("/guide/procedure-deces")({
@@ -126,6 +142,16 @@ function ProcedureDecesPage() {
         </section>
 
         <section className="container mx-auto max-w-5xl px-4 py-12">
+          <div className="mb-10 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            {checkpoints.map((item) => (
+              <div key={item.label} className="rounded-lg border bg-card p-4">
+                <item.icon className="h-5 w-5 text-primary" />
+                <div className="mt-3 text-xs uppercase text-muted-foreground">{item.label}</div>
+                <div className="font-semibold">{item.value}</div>
+              </div>
+            ))}
+          </div>
+
           <div className="grid gap-4 md:grid-cols-3">
             <Card>
               <CardContent className="p-6">
@@ -146,6 +172,23 @@ function ProcedureDecesPage() {
               </CardContent>
             </Card>
           </div>
+
+          <section className="mt-12 grid gap-6 md:grid-cols-[1fr_0.8fr] md:items-start">
+            <div className="rounded-lg border bg-card p-6">
+              <h2 className="flex items-center gap-2 text-2xl font-semibold tracking-tight"><FileCheck2 className="h-6 w-6 text-primary" /> Pièces et informations à préparer</h2>
+              <ul className="mt-5 grid gap-3 text-sm text-muted-foreground">
+                {pieces.map((p) => <li key={p} className="flex gap-2"><CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-primary" />{p}</li>)}
+              </ul>
+            </div>
+            <div className="rounded-lg border border-destructive/20 bg-destructive/5 p-6">
+              <h2 className="flex items-center gap-2 text-xl font-semibold tracking-tight text-destructive"><AlertTriangle className="h-5 w-5" /> Points de vigilance</h2>
+              <ul className="mt-4 space-y-2 text-sm text-muted-foreground">
+                <li>Ne pas lancer une collecte avant validation du bureau.</li>
+                <li>Éviter les doublons : un décès correspond à un seul dossier officiel.</li>
+                <li>Contrôler le statut actif et l'ancienneté du membre avant assistance.</li>
+              </ul>
+            </div>
+          </section>
 
           <div className="mt-12 space-y-6">
             {steps.map((step, index) => (
@@ -170,6 +213,13 @@ function ProcedureDecesPage() {
               <li>Conserver les reçus de paiement et les preuves des cotisations appelées après la déclaration.</li>
               <li>Signaler toute souscription NSIA active afin que le dossier partenaire soit suivi sans retard.</li>
             </ul>
+          </section>
+
+          <section className="mt-8 rounded-lg border bg-card p-6">
+            <h2 className="flex items-center gap-2 text-2xl font-semibold tracking-tight"><Clock className="h-6 w-6 text-primary" /> Suivi après validation</h2>
+            <p className="mt-3 text-sm text-muted-foreground">
+              Après ouverture du dossier, le bureau suit les cotisations, les preuves de paiement, l'éligibilité assistance ANZRBO et, si nécessaire, la transmission du dossier NSIA. Les familles doivent conserver un contact disponible jusqu'à clôture.
+            </p>
           </section>
 
           <div className="mt-10 flex flex-wrap gap-3">

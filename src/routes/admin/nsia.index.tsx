@@ -1,11 +1,14 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useEffect } from "react";
+import { useServerFn } from "@tanstack/react-start";
+import { useQuery } from "@tanstack/react-query";
 import { DashboardHeader, ADMIN_NAV } from "@/components/DashboardHeader";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useAuth, clientRoleGuard } from "@/lib/auth";
-import { SOUSCRIPTIONS_NSIA, PAIEMENTS_NSIA, DECLARATIONS, FORMULES_NSIA, membre } from "@/lib/data";
+import { FORMULES_NSIA } from "@/lib/data";
+import { listNsiaSubscriptions } from "@/lib/members.functions";
 import { ShieldCheck, Plus } from "lucide-react";
 
 export const Route = createFileRoute("/admin/nsia/")({
@@ -18,18 +21,27 @@ function Page() {
   const { user, loading } = useAuth();
   const nav = useNavigate();
   useEffect(() => { if (!loading && (!user || user.role !== "admin_anzrbo")) nav({ to: "/login" }); }, [user, loading, nav]);
+  const listNsiaFn = useServerFn(listNsiaSubscriptions);
+  const { data, isLoading } = useQuery({
+    queryKey: ["nsia-subscriptions"],
+    queryFn: () => listNsiaFn(),
+    enabled: !!user,
+    refetchOnWindowFocus: true,
+  });
   if (loading || !user) return <div className="flex min-h-screen items-center justify-center">Chargement…</div>;
 
-  const totalCotisations = SOUSCRIPTIONS_NSIA.reduce((s, x) => s + x.cotisationAnnuelle, 0);
-  const totalVerses = PAIEMENTS_NSIA.reduce((s, x) => s + x.beneficeBrut, 0);
-  const totalCommissions = PAIEMENTS_NSIA.reduce((s, x) => s + x.commissionAssoc, 0);
+  const rows = data?.rows ?? [];
+  const parsedRows = rows.map((r: any) => ({ ...r, meta: safeJson(r.notes)?.nsia ? safeJson(r.notes) : null }));
+  const totalCotisations = rows.reduce((s: number, x: any) => s + (Number(x.montant) || 0), 0);
+  const totalVerses = 0;
+  const totalCommissions = 0;
 
   return (
     <div className="min-h-screen bg-muted/30">
       <DashboardHeader title="Partenariat NSIA — ANZRBO" nav={ADMIN_NAV} />
       <main className="container mx-auto max-w-7xl space-y-6 px-4 py-8">
         <div className="grid gap-4 md:grid-cols-4">
-          <Stat label="Souscriptions actives" value={SOUSCRIPTIONS_NSIA.length} />
+          <Stat label="Souscriptions actives" value={rows.length} />
           <Stat label="Cotisations annuelles totales" value={`${totalCotisations.toLocaleString("fr-FR")} F`} />
           <Stat label="Bénéfices NSIA reçus" value={`${totalVerses.toLocaleString("fr-FR")} F`} />
           <Stat label="Commission ANZRBO (25%)" value={`${totalCommissions.toLocaleString("fr-FR")} F`} />
@@ -54,16 +66,19 @@ function Page() {
                 <TableHead>Cotisation annuelle</TableHead><TableHead>Depuis</TableHead>
               </TableRow></TableHeader>
               <TableBody>
-                {SOUSCRIPTIONS_NSIA.map((s) => {
-                  const m = membre(s.membreId)!;
+                {isLoading && <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground">Chargement…</TableCell></TableRow>}
+                {!isLoading && parsedRows.length === 0 && <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground">Aucune souscription enregistrée.</TableCell></TableRow>}
+                {parsedRows.map((s: any) => {
+                  const m = s.members;
+                  const meta = s.meta ?? {};
                   return (
                     <TableRow key={s.id}>
-                      <TableCell>{m.prenoms} {m.nom}</TableCell>
-                      <TableCell>Formule {s.formule}</TableCell>
-                      <TableCell>{s.benefice.toLocaleString("fr-FR")} F</TableCell>
-                      <TableCell>{s.nbPersonnes}</TableCell>
-                      <TableCell className="font-semibold">{s.cotisationAnnuelle.toLocaleString("fr-FR")} F</TableCell>
-                      <TableCell>{new Date(s.dateSouscription).toLocaleDateString("fr-FR")}</TableCell>
+                      <TableCell>{m?.prenoms} {m?.nom}<div className="font-mono text-xs text-muted-foreground">{m?.numero_membre}</div></TableCell>
+                      <TableCell>Formule {meta.formule ?? "—"}</TableCell>
+                      <TableCell>{Number(meta.benefice ?? 0).toLocaleString("fr-FR")} F</TableCell>
+                      <TableCell>{meta.nbPersonnes ?? "—"}</TableCell>
+                      <TableCell className="font-semibold">{Number(s.montant ?? 0).toLocaleString("fr-FR")} F</TableCell>
+                      <TableCell>{new Date(s.paye_le ?? s.created_at).toLocaleDateString("fr-FR")}</TableCell>
                     </TableRow>
                   );
                 })}
@@ -85,18 +100,7 @@ function Page() {
                 <TableHead>Net famille</TableHead>
               </TableRow></TableHeader>
               <TableBody>
-                {PAIEMENTS_NSIA.map((p) => {
-                  const d = DECLARATIONS.find((x) => x.id === p.declarationId)!;
-                  return (
-                    <TableRow key={p.id}>
-                      <TableCell>{d.nomDefunt}</TableCell>
-                      <TableCell>{new Date(p.date).toLocaleDateString("fr-FR")}</TableCell>
-                      <TableCell>{p.beneficeBrut.toLocaleString("fr-FR")} F</TableCell>
-                      <TableCell className="font-semibold text-blue-700">{p.commissionAssoc.toLocaleString("fr-FR")} F</TableCell>
-                      <TableCell>{p.netFamille.toLocaleString("fr-FR")} F</TableCell>
-                    </TableRow>
-                  );
-                })}
+                <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground">Aucun versement sinistre NSIA enregistré dans la base.</TableCell></TableRow>
               </TableBody>
             </Table>
           </CardContent>
@@ -129,4 +133,8 @@ function Page() {
 
 function Stat({ label, value }: { label: string; value: any }) {
   return <Card><CardContent className="p-5"><div className="text-xs uppercase text-muted-foreground">{label}</div><div className="text-2xl font-bold">{value}</div></CardContent></Card>;
+}
+
+function safeJson(v: any) {
+  try { return typeof v === "string" ? JSON.parse(v) : v ?? {}; } catch { return {}; }
 }
