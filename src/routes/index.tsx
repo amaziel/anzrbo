@@ -3,7 +3,7 @@ import { SiteHeader } from "@/components/SiteHeader";
 import { SiteFooter } from "@/components/SiteFooter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { ArrowRight, ScanLine, Users, HandCoins, Heart, ShieldCheck, Bell, BadgeCheck } from "lucide-react";
+import { ArrowRight, ScanLine, Users, HandCoins, Heart, ShieldCheck, Bell, BadgeCheck, FileCheck2, Smartphone } from "lucide-react";
 import logo from "@/assets/anzrbo-logo.png";
 
 export const Route = createFileRoute("/")({
@@ -38,17 +38,22 @@ const features = [
   { icon: BadgeCheck, title: "Carte membre & QR Code", desc: "Carte membre générée automatiquement avec QR Code pour consultation publique simplifiée." },
 ];
 
+const workflow = [
+  { icon: Users, title: "Inscription fiable", text: "Informations, photo, contacts et ayants droit sont centralisés dans le registre." },
+  { icon: BadgeCheck, title: "Carte vérifiable", text: "QR code public relié au numéro de membre et aux contacts à jour." },
+  { icon: HandCoins, title: "Paiements suivis", text: "Cotisations, frais et justificatifs consultables par les responsables autorisés." },
+  { icon: FileCheck2, title: "Dossier décès", text: "Guide officiel pour préparer rapidement les pièces nécessaires." },
+];
+
 function Index() {
   return (
     <div className="min-h-screen bg-background">
       <SiteHeader />
 
-      <section className="relative overflow-hidden border-b">
-        <div aria-hidden className="pointer-events-none absolute -right-32 -top-32 h-[500px] w-[500px] rounded-full bg-primary/10 blur-3xl" />
-        <div aria-hidden className="pointer-events-none absolute -bottom-40 -left-32 h-[400px] w-[400px] rounded-full bg-accent/10 blur-3xl" />
-        <div className="container relative mx-auto grid max-w-7xl items-center gap-12 px-4 py-16 md:grid-cols-2 md:py-24">
+      <section className="border-b bg-gradient-to-b from-secondary/45 via-background to-background">
+        <div className="container mx-auto grid max-w-7xl items-center gap-10 px-4 py-12 md:grid-cols-[1.08fr_0.92fr] md:py-20">
           <div>
-            <span className="inline-flex items-center rounded-full bg-secondary px-3 py-1 text-xs font-semibold uppercase tracking-wider text-primary">
+            <span className="inline-flex items-center rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold uppercase tracking-wider text-primary">
               Association d'entraide
             </span>
             <h1 className="mt-5 text-4xl font-bold leading-tight tracking-tight text-foreground md:text-5xl lg:text-6xl">
@@ -59,7 +64,7 @@ function Index() {
               Association des N'Zipris Résidents à Bonon. Solidarité, transparence et accompagnement
               des familles dans les moments difficiles, sous-préfecture de Bonon, Côte d'Ivoire.
             </p>
-            <div className="mt-8 flex flex-wrap gap-3">
+            <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
               <Button asChild size="lg">
                 <Link to="/scanner">
                   <ScanLine className="mr-2 h-4 w-4" /> Scanner un QR Code
@@ -74,14 +79,19 @@ function Index() {
                 <Link to="/guide/procedure-deces">Guide procédure décès</Link>
               </Button>
             </div>
-            <p className="mt-6 text-xs text-muted-foreground">
+            <div className="mt-6 grid max-w-2xl gap-3 sm:grid-cols-3">
+              <MiniProof icon={ShieldCheck} label="Registre protégé" />
+              <MiniProof icon={Smartphone} label="Scan public rapide" />
+              <MiniProof icon={Heart} label="Solidarité décès" />
+            </div>
+            <p className="mt-5 text-xs text-muted-foreground">
               L'inscription d'un membre est effectuée uniquement par un administrateur ANZRBO.
             </p>
           </div>
 
           <div className="relative">
-            <div className="rounded-2xl border bg-card p-8 shadow-xl">
-              <img src={logo} alt="Association ANZRBO — Entraide et Solidarité" className="mx-auto h-32 w-auto md:h-40" />
+            <div className="rounded-lg border bg-card p-6 shadow-xl md:p-8">
+              <img src={logo} alt="Association ANZRBO — Entraide et Solidarité" className="mx-auto h-32 w-auto md:h-44" />
               <p className="mt-6 text-center text-sm italic text-muted-foreground">
                 « Unis dans la solidarité, forts dans l'entraide »
               </p>
@@ -94,6 +104,25 @@ function Index() {
                 ))}
               </div>
             </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="border-b bg-secondary/25">
+        <div className="container mx-auto grid max-w-7xl gap-6 px-4 py-12 lg:grid-cols-[0.8fr_1.2fr] lg:items-center">
+          <div>
+            <p className="text-sm font-semibold uppercase tracking-wider text-primary">Fonctionnement</p>
+            <h2 className="mt-2 text-3xl font-bold tracking-tight">Un parcours clair, du membre à l'assistance</h2>
+            <p className="mt-3 text-sm text-muted-foreground">Recherche rapide des membres, données fiables et traçabilité des actions du bureau.</p>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            {workflow.map((item) => (
+              <div key={item.title} className="rounded-lg border bg-background p-5">
+                <div className="mb-3 inline-flex h-10 w-10 items-center justify-center rounded-md bg-primary/10 text-primary"><item.icon className="h-5 w-5" /></div>
+                <h3 className="font-semibold">{item.title}</h3>
+                <p className="mt-2 text-sm text-muted-foreground">{item.text}</p>
+              </div>
+            ))}
           </div>
         </div>
       </section>
@@ -158,4 +187,8 @@ function Index() {
       <SiteFooter />
     </div>
   );
+}
+
+function MiniProof({ icon: Icon, label }: { icon: any; label: string }) {
+  return <div className="flex items-center gap-2 rounded-md border bg-background/80 px-3 py-2 text-xs font-medium"><Icon className="h-4 w-4 text-primary" />{label}</div>;
 }
