@@ -24,7 +24,7 @@ function Page() {
   const listNsiaFn = useServerFn(listNsiaSubscriptions);
   const { data, isLoading } = useQuery({
     queryKey: ["nsia-subscriptions"],
-    queryFn: () => listNsiaFn({ data: {} }),
+    queryFn: () => listNsiaFn(),
     enabled: !!user,
     refetchOnWindowFocus: true,
   });

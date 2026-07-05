@@ -54,7 +54,7 @@ function Page() {
   });
   const { data: nsiaData } = useQuery({
     queryKey: ["nsia-subscriptions"],
-    queryFn: () => listNsiaFn({ data: {} }),
+    queryFn: () => listNsiaFn(),
     enabled: !!user,
     refetchOnWindowFocus: true,
   });
@@ -121,7 +121,7 @@ function Page() {
                   <SelectContent>
                     {eligibles.map((mm) => (
                       <SelectItem key={mm.id} value={mm.id}>
-                        {mm.numeroMembre} — {mm.prenoms} {mm.nom} ({mm.telephone})
+                        {mm.numero_membre} — {mm.prenoms} {mm.nom} ({mm.telephone})
                       </SelectItem>
                     ))}
                   </SelectContent>

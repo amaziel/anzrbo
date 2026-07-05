@@ -26,7 +26,7 @@ function NsiaDashboard() {
   const nav = useNavigate();
   useEffect(() => { if (!loading && (!user || !user.roles.includes("nsia"))) nav({ to: "/login" }); }, [user, loading, nav]);
   const listNsiaFn = useServerFn(listNsiaSubscriptions);
-  const { data, isLoading } = useQuery({ queryKey: ["nsia-subscriptions"], queryFn: () => listNsiaFn({ data: {} }), enabled: !!user, refetchOnWindowFocus: true });
+  const { data, isLoading } = useQuery({ queryKey: ["nsia-subscriptions"], queryFn: () => listNsiaFn(), enabled: !!user, refetchOnWindowFocus: true });
   const subscriptions = (data?.rows ?? []).map((r: any) => ({ ...r, meta: safeJson(r.notes)?.nsia ? safeJson(r.notes) : {} }));
 
   const totalCot = subscriptions.reduce((s: number, x: any) => s + (Number(x.montant) || 0), 0);
