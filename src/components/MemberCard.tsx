@@ -11,10 +11,16 @@ import type { Membre } from "@/lib/data";
 const CARD_W = "85.6mm";
 const CARD_H = "53.98mm";
 
-function fullVerifierUrl(numeroMembre: string) {
+function fullVerifierUrl(numeroMembre: string, m?: Partial<Membre>) {
   const origin =
     typeof window !== "undefined" ? window.location.origin : "https://anzrbo.digitorg.net";
-  return `${origin}/verifier/${encodeURIComponent(numeroMembre)}`;
+  const params = new URLSearchParams();
+  const tel = String(m?.telephone ?? "").replace(/\D/g, "");
+  const tel2 = String(m?.contact2 ?? "").replace(/\D/g, "");
+  if (tel && !/^0+$/.test(tel)) params.set("t", tel);
+  if (tel2 && !/^0+$/.test(tel2)) params.set("c", tel2);
+  params.set("v", String(m?.dateInscription ?? Date.now()));
+  return `${origin}/verifier/${encodeURIComponent(numeroMembre)}?${params.toString()}`;
 }
 
 function qrCacheKey(m: Membre) {
@@ -43,8 +49,8 @@ function photoFor(m: Membre) {
 }
 
 const QR_CACHE = new Map<string, string>();
-export function useMemberQr(numeroMembre: string, cacheKey = numeroMembre) {
-  const url = fullVerifierUrl(numeroMembre);
+export function useMemberQr(numeroMembre: string, cacheKey = numeroMembre, member?: Partial<Membre>) {
+  const url = fullVerifierUrl(numeroMembre, member);
   const key = `${url}|${cacheKey}`;
   const [dataUrl, setDataUrl] = useState<string>(() => QR_CACHE.get(key) ?? "");
   useEffect(() => {
@@ -66,7 +72,7 @@ export function useMemberQr(numeroMembre: string, cacheKey = numeroMembre) {
 }
 
 export function MemberCardRecto({ m }: { m: Membre }) {
-  const qr = useMemberQr(m.numeroMembre, qrCacheKey(m));
+  const qr = useMemberQr(m.numeroMembre, qrCacheKey(m), m);
   return (
     <div
       className="card-anzrbo relative overflow-hidden rounded-[3mm] bg-white text-[#1a1a1a] shadow-[0_8px_24px_-12px_rgba(0,0,0,0.35)]"
