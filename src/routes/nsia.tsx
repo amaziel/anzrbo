@@ -1,13 +1,14 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo } from "react";
+import { useServerFn } from "@tanstack/react-start";
+import { useQuery } from "@tanstack/react-query";
 import { DashboardHeader, NSIA_NAV } from "@/components/DashboardHeader";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useAuth, clientRoleGuard } from "@/lib/auth";
-import {
-  SOUSCRIPTIONS_NSIA, PAIEMENTS_NSIA, DECLARATIONS, FORMULES_NSIA, membre, TAUX_COMMISSION_NSIA,
-} from "@/lib/data";
+import { FORMULES_NSIA, TAUX_COMMISSION_NSIA } from "@/lib/data";
+import { listNsiaSubscriptions } from "@/lib/members.functions";
 import { ShieldCheck, Sparkles, Users, Wallet, HandCoins, PieChart as PieIcon } from "lucide-react";
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend } from "recharts";
 
@@ -24,21 +25,24 @@ function NsiaDashboard() {
   const { user, loading } = useAuth();
   const nav = useNavigate();
   useEffect(() => { if (!loading && (!user || !user.roles.includes("nsia"))) nav({ to: "/login" }); }, [user, loading, nav]);
+  const listNsiaFn = useServerFn(listNsiaSubscriptions);
+  const { data, isLoading } = useQuery({ queryKey: ["nsia-subscriptions"], queryFn: () => listNsiaFn({ data: {} }), enabled: !!user, refetchOnWindowFocus: true });
+  const subscriptions = (data?.rows ?? []).map((r: any) => ({ ...r, meta: safeJson(r.notes)?.nsia ? safeJson(r.notes) : {} }));
 
-  const totalCot = SOUSCRIPTIONS_NSIA.reduce((s, x) => s + x.cotisationAnnuelle, 0);
-  const totalVerses = PAIEMENTS_NSIA.reduce((s, x) => s + x.beneficeBrut, 0);
-  const commissionAssoc = PAIEMENTS_NSIA.reduce((s, x) => s + x.commissionAssoc, 0);
-  const netFamilles = PAIEMENTS_NSIA.reduce((s, x) => s + x.netFamille, 0);
+  const totalCot = subscriptions.reduce((s: number, x: any) => s + (Number(x.montant) || 0), 0);
+  const totalVerses = 0;
+  const commissionAssoc = 0;
+  const netFamilles = 0;
 
   const repFormules = useMemo(() => {
     const map = new Map<number, number>();
-    SOUSCRIPTIONS_NSIA.forEach((s) => map.set(s.formule, (map.get(s.formule) ?? 0) + 1));
+    subscriptions.forEach((s: any) => map.set(Number(s.meta.formule ?? 0), (map.get(Number(s.meta.formule ?? 0)) ?? 0) + 1));
     const colors = ["var(--nsia-chart-1)", "var(--nsia-chart-2)", "var(--nsia-chart-3)", "var(--nsia-chart-4)", "var(--nsia-chart-5)"];
     return Array.from(map.entries()).map(([formule, count]) => ({
       name: `Formule ${formule}`, value: count,
       color: colors[(formule - 1) % colors.length],
     }));
-  }, []);
+  }, [subscriptions]);
 
   if (loading || !user) return <div className="flex min-h-screen items-center justify-center text-muted-foreground">Chargement…</div>;
 
@@ -62,9 +66,9 @@ function NsiaDashboard() {
 
 
         <section className="grid grid-cols-2 gap-4 md:grid-cols-4">
-          <KPI icon={Users} label="Souscriptions actives" value={SOUSCRIPTIONS_NSIA.length} />
+          <KPI icon={Users} label="Souscriptions actives" value={subscriptions.length} />
           <KPI icon={Wallet} label="Cotisations annuelles" value={`${totalCot.toLocaleString("fr-FR")} F`} />
-          <KPI icon={HandCoins} label="Bénéfices versés" value={`${totalVerses.toLocaleString("fr-FR")} F`} trend={`${PAIEMENTS_NSIA.length} sinistres réglés`} />
+          <KPI icon={HandCoins} label="Bénéfices versés" value={`${totalVerses.toLocaleString("fr-FR")} F`} trend="0 sinistre réglé" />
           <KPI icon={ShieldCheck} label="Commission ANZRBO 25%" value={`${commissionAssoc.toLocaleString("fr-FR")} F`} trend={`Net familles : ${netFamilles.toLocaleString("fr-FR")} F`} />
         </section>
 
@@ -84,17 +88,19 @@ function NsiaDashboard() {
                   <TableHead>Depuis</TableHead>
                 </TableRow></TableHeader>
                 <TableBody>
-                  {SOUSCRIPTIONS_NSIA.map((s) => {
-                    const m = membre(s.membreId)!;
+                  {isLoading && <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground">Chargement…</TableCell></TableRow>}
+                  {!isLoading && subscriptions.length === 0 && <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground">Aucune souscription DB.</TableCell></TableRow>}
+                  {subscriptions.map((s: any) => {
+                    const m = s.members;
                     return (
                       <TableRow key={s.id}>
-                        <TableCell>{m.prenoms} {m.nom}</TableCell>
-                        <TableCell className="text-muted-foreground">{m.telephone}</TableCell>
-                        <TableCell>Formule {s.formule}</TableCell>
-                        <TableCell>{s.benefice.toLocaleString("fr-FR")} F</TableCell>
-                        <TableCell>{s.nbPersonnes}</TableCell>
-                        <TableCell className="font-semibold">{s.cotisationAnnuelle.toLocaleString("fr-FR")} F</TableCell>
-                        <TableCell>{new Date(s.dateSouscription).toLocaleDateString("fr-FR")}</TableCell>
+                        <TableCell>{m?.prenoms} {m?.nom}</TableCell>
+                        <TableCell className="text-muted-foreground">{m?.telephone}</TableCell>
+                        <TableCell>Formule {s.meta.formule ?? "—"}</TableCell>
+                        <TableCell>{Number(s.meta.benefice ?? 0).toLocaleString("fr-FR")} F</TableCell>
+                        <TableCell>{s.meta.nbPersonnes ?? "—"}</TableCell>
+                        <TableCell className="font-semibold">{Number(s.montant ?? 0).toLocaleString("fr-FR")} F</TableCell>
+                        <TableCell>{new Date(s.paye_le ?? s.created_at).toLocaleDateString("fr-FR")}</TableCell>
                       </TableRow>
                     );
                   })}
@@ -139,21 +145,7 @@ function NsiaDashboard() {
                 <TableHead>Commission ANZRBO</TableHead><TableHead>Net famille</TableHead>
               </TableRow></TableHeader>
               <TableBody>
-                {PAIEMENTS_NSIA.map((p) => {
-                  const d = DECLARATIONS.find((x) => x.id === p.declarationId)!;
-                  const s = SOUSCRIPTIONS_NSIA.find((x) => x.id === p.souscriptionId)!;
-                  const m = membre(s.membreId)!;
-                  return (
-                    <TableRow key={p.id}>
-                      <TableCell className="font-medium">{d.nomDefunt}</TableCell>
-                      <TableCell>{m.prenoms} {m.nom}</TableCell>
-                      <TableCell>{new Date(p.date).toLocaleDateString("fr-FR")}</TableCell>
-                      <TableCell>{p.beneficeBrut.toLocaleString("fr-FR")} F</TableCell>
-                      <TableCell className="font-semibold text-primary">{p.commissionAssoc.toLocaleString("fr-FR")} F</TableCell>
-                      <TableCell className="font-semibold text-accent">{p.netFamille.toLocaleString("fr-FR")} F</TableCell>
-                    </TableRow>
-                  );
-                })}
+                <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground">Aucun sinistre réglé enregistré.</TableCell></TableRow>
               </TableBody>
             </Table>
           </CardContent>
@@ -203,4 +195,8 @@ function KPI({ icon: Icon, label, value, trend }: { icon: any; label: string; va
       </CardContent>
     </Card>
   );
+}
+
+function safeJson(v: any) {
+  try { return typeof v === "string" ? JSON.parse(v) : v ?? {}; } catch { return {}; }
 }

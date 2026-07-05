@@ -1,5 +1,7 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
+import { useServerFn } from "@tanstack/react-start";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { DashboardHeader, ADMIN_NAV } from "@/components/DashboardHeader";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -7,9 +9,8 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAuth, clientRoleGuard } from "@/lib/auth";
-import {
-  MEMBRES, FORMULES_NSIA, SOUSCRIPTIONS_NSIA, ayantsDroitDe, souscriptionDe,
-} from "@/lib/data";
+import { FORMULES_NSIA } from "@/lib/data";
+import { createNsiaSubscription, listMembers, listNsiaSubscriptions, type MemberRow } from "@/lib/members.functions";
 import { ShieldCheck, ArrowLeft, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 import { useFormDraft } from "@/lib/useFormDraft";
@@ -23,6 +24,10 @@ export const Route = createFileRoute("/admin/nsia/nouveau")({
 function Page() {
   const { user, loading } = useAuth();
   const nav = useNavigate();
+  const qc = useQueryClient();
+  const listFn = useServerFn(listMembers);
+  const listNsiaFn = useServerFn(listNsiaSubscriptions);
+  const createNsiaFn = useServerFn(createNsiaSubscription);
   useEffect(() => { if (!loading && (!user || user.role !== "admin_anzrbo")) nav({ to: "/login" }); }, [user, loading, nav]);
 
   const [membreId, setMembreId] = useState("");
@@ -41,28 +46,52 @@ function Page() {
     },
   );
 
+  const { data: membersData, isLoading: loadingMembers } = useQuery({
+    queryKey: ["members", "nsia-eligibles"],
+    queryFn: () => listFn({ data: { q: "", page: 1, pageSize: 100, statut: "actif" } }),
+    enabled: !!user,
+    refetchOnWindowFocus: true,
+  });
+  const { data: nsiaData } = useQuery({
+    queryKey: ["nsia-subscriptions"],
+    queryFn: () => listNsiaFn({ data: {} }),
+    enabled: !!user,
+    refetchOnWindowFocus: true,
+  });
+  const subscribedIds = useMemo(() => new Set((nsiaData?.rows ?? []).map((r: any) => r.member_id)), [nsiaData]);
   const eligibles = useMemo(
-    () => MEMBRES.filter((m) => m.statut === "actif" && !souscriptionDe(m.id)),
-    [],
+    () => (membersData?.rows ?? []).filter((m: MemberRow) => m.statut === "actif" && !subscribedIds.has(m.id)),
+    [membersData, subscribedIds],
   );
-  const f = FORMULES_NSIA.find((x) => x.n === formule)!;
+  const f = FORMULES_NSIA.find((x) => x.n === formule) ?? FORMULES_NSIA[4];
   const cotisationTotale = f.cotisation * Math.max(1, nbPersonnes);
-  const m = MEMBRES.find((x) => x.id === membreId);
-  const maxPersonnes = m ? 1 + ayantsDroitDe(m.id).length : 1;
+  const m = (membersData?.rows ?? []).find((x: MemberRow) => x.id === membreId);
+  const maxPersonnes = 10;
+
+  const createMut = useMutation({
+    mutationFn: () => createNsiaFn({ data: {
+      member_id: membreId,
+      formule,
+      benefice: f.benefice,
+      cotisationUnitaire: f.cotisation,
+      nbPersonnes,
+      dateSouscription: date,
+    } }),
+    onSuccess: (res) => {
+      toast.success(res.duplicate ? "Souscription NSIA déjà existante" : `Souscription NSIA enregistrée pour ${m?.prenoms ?? ""} ${m?.nom ?? ""}`);
+      draft.clear();
+      qc.invalidateQueries({ queryKey: ["nsia-subscriptions"] });
+      qc.invalidateQueries({ queryKey: ["members"] });
+      nav({ to: "/admin/nsia" });
+    },
+    onError: (e: any) => toast.error(e?.message ?? "Souscription impossible"),
+  });
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
     if (!m) { toast.error("Sélectionnez un membre"); return; }
-    if (souscriptionDe(m.id)) { toast.error("Ce membre a déjà une souscription NSIA active"); return; }
-    SOUSCRIPTIONS_NSIA.push({
-      id: `s-${Date.now()}`,
-      membreId: m.id, formule, benefice: f.benefice, cotisationUnitaire: f.cotisation,
-      nbPersonnes, cotisationAnnuelle: cotisationTotale,
-      dateSouscription: date, actif: true,
-    });
-    toast.success(`Souscription NSIA enregistrée pour ${m.prenoms} ${m.nom}`);
-    draft.clear();
-    nav({ to: "/admin/nsia" });
+    if (subscribedIds.has(m.id)) { toast.error("Ce membre a déjà une souscription NSIA active"); return; }
+    createMut.mutate();
   }
 
   if (loading || !user) return <div className="flex min-h-screen items-center justify-center">Chargement…</div>;
@@ -88,7 +117,7 @@ function Page() {
               <div className="grid gap-2">
                 <Label>Membre principal</Label>
                 <Select value={membreId} onValueChange={setMembreId}>
-                  <SelectTrigger><SelectValue placeholder={`Choisir parmi ${eligibles.length} membre(s) éligible(s)…`} /></SelectTrigger>
+                  <SelectTrigger><SelectValue placeholder={loadingMembers ? "Chargement des membres…" : `Choisir parmi ${eligibles.length} membre(s) éligible(s)…`} /></SelectTrigger>
                   <SelectContent>
                     {eligibles.map((mm) => (
                       <SelectItem key={mm.id} value={mm.id}>
@@ -99,7 +128,7 @@ function Page() {
                 </Select>
                 {m && (
                   <p className="text-xs text-muted-foreground">
-                    Foyer : 1 souscripteur + {ayantsDroitDe(m.id).length} ayant(s) droit ⇒ max {maxPersonnes} personnes couvrables.
+                    Membre DB : {m.numero_membre} — contact {m.telephone || "non renseigné"}. Jusqu'à {maxPersonnes} personnes couvrables.
                   </p>
                 )}
               </div>
@@ -146,8 +175,8 @@ function Page() {
 
               <div className="flex justify-end gap-2 pt-2">
                 <Button asChild variant="outline"><Link to="/admin/nsia">Annuler</Link></Button>
-                <Button type="submit" className="bg-blue-600 hover:bg-blue-700">
-                  <CheckCircle2 className="mr-2 h-4 w-4" /> Enregistrer la souscription
+                <Button type="submit" className="bg-blue-600 hover:bg-blue-700" disabled={createMut.isPending || !membreId}>
+                  <CheckCircle2 className="mr-2 h-4 w-4" /> {createMut.isPending ? "Enregistrement…" : "Enregistrer la souscription"}
                 </Button>
               </div>
             </form>
