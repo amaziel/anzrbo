@@ -48,6 +48,21 @@ async function assertAnzrboAdmin(supabase: any, userId: string) {
   throw new Error("Forbidden");
 }
 
+async function assertAnyRole(supabase: any, userId: string, roles: string[]) {
+  try {
+    const db = await getTrustedDbClient({ supabase });
+    const { data, error } = await db.from("user_roles").select("role").eq("user_id", userId).in("role", roles);
+    if (!error && (data?.length ?? 0) > 0) return;
+  } catch { /* fallback below */ }
+  for (const r of roles) {
+    try {
+      const { data, error } = await supabase.rpc("has_role", { _user_id: userId, _role: r });
+      if (!error && data) return;
+    } catch { /* unknown enum value */ }
+  }
+  throw new Error("Forbidden");
+}
+
 const SUPABASE_URL_FALLBACK = "https://ogseybvemtoxqpgpxewg.supabase.co";
 const SUPABASE_PUBLISHABLE_KEY_FALLBACK = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9nc2V5YnZlbXRveHFwZ3B4ZXdnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIzNzYyNDcsImV4cCI6MjA5Nzk1MjI0N30.16aClFbUFKk-VH2_CHY7P6kX3rU3IZ6uGEzK_LsNe54";
 const INLINE_UPLOAD_MAX_BYTES = 900_000;
@@ -156,6 +171,35 @@ export const listMembers = createServerFn({ method: "POST" })
     const { data: rows, count, error } = await q;
     if (error) throw new Error(error.message);
     return { rows: (rows ?? []) as MemberRow[], total: count ?? 0, page: data.page, pageSize: data.pageSize };
+  });
+
+export const getMemberStats = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    await assertAnyRole(context.supabase, context.userId, ["super_admin", "admin_national", "admin_anzrbo", "agent_saisie", "digitorg"]);
+    const db = await getTrustedDbClient(context);
+    const { data: members, error } = await db
+      .from("members")
+      .select("id,statut,date_inscription,created_at")
+      .order("created_at", { ascending: false })
+      .limit(3000);
+    if (error) throw detailedSupabaseError("Statistiques membres", error);
+    const rows = members ?? [];
+    const total = rows.length;
+    const actifs = rows.filter((m: any) => m.statut === "actif").length;
+    const suspendus = rows.filter((m: any) => m.statut === "suspendu").length;
+    const decedes = rows.filter((m: any) => m.statut === "decede").length;
+    const months = ["Jan", "Fév", "Mar", "Avr", "Mai", "Juin", "Juil", "Août", "Sept", "Oct", "Nov", "Déc"];
+    const trend = months.map((mois) => ({ mois, inscriptions: 0, frais: 0 }));
+    rows.forEach((m: any) => {
+      const d = new Date(m.date_inscription ?? m.created_at);
+      if (Number.isFinite(d.getTime())) {
+        const b = trend[d.getMonth()];
+        b.inscriptions += 1;
+        b.frais += 1500;
+      }
+    });
+    return { total, actifs, suspendus, decedes, fraisInscription: total * 1500, trend };
   });
 
 export const getMember = createServerFn({ method: "POST" })
@@ -439,7 +483,7 @@ export const listPaiements = createServerFn({ method: "POST" })
 export const listNsiaSubscriptions = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    await assertAnzrboAdmin(context.supabase, context.userId);
+    await assertAnyRole(context.supabase, context.userId, ["super_admin", "admin_national", "admin_anzrbo", "agent_saisie", "nsia"]);
     const db = await getTrustedDbClient(context);
     const { data: rows, error } = await db
       .from("paiements")

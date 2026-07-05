@@ -11,8 +11,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { useAuth, clientRoleGuard } from "@/lib/auth";
-import { listMembers, getMember, deleteMember, addPaiement, uploadFile, type MemberRow } from "@/lib/members.functions";
-import { Search, Users, Eye, Trash2, Receipt, ChevronLeft, ChevronRight, Printer, QrCode, Pencil } from "lucide-react";
+import { listMembers, getMember, deleteMember, addPaiement, uploadFile, updateMember, type MemberRow } from "@/lib/members.functions";
+import { Search, Users, Eye, Trash2, Receipt, ChevronLeft, ChevronRight, Printer, QrCode, Pencil, PauseCircle, CheckCircle2, Skull } from "lucide-react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/admin/membres/")({
@@ -37,6 +37,7 @@ function ListeMembres() {
 
   const listFn = useServerFn(listMembers);
   const delFn = useServerFn(deleteMember);
+  const updateFn = useServerFn(updateMember);
   const qc = useQueryClient();
 
   const [q, setQ] = useState("");
@@ -55,6 +56,12 @@ function ListeMembres() {
     mutationFn: (id: string) => delFn({ data: { id } }),
     onSuccess: () => { toast.success("Membre supprimé"); qc.invalidateQueries({ queryKey: ["members"] }); },
     onError: (e: any) => toast.error(e?.message ?? "Erreur"),
+  });
+
+  const statusMut = useMutation({
+    mutationFn: ({ id, statut }: { id: string; statut: "actif" | "suspendu" | "decede" }) => updateFn({ data: { id, patch: { statut } } }),
+    onSuccess: () => { toast.success("Statut membre mis à jour"); qc.invalidateQueries({ queryKey: ["members"] }); },
+    onError: (e: any) => toast.error(e?.message ?? "Modification impossible"),
   });
 
   if (loading || !user) return <div className="flex min-h-screen items-center justify-center">Chargement…</div>;
@@ -126,6 +133,9 @@ function ListeMembres() {
                       <Button size="sm" variant="ghost" onClick={() => nav({ to: "/admin/membres/$id/modifier" as any, params: { id: m.id } as any })} title="Modifier le membre"><Pencil className="h-4 w-4" /></Button>
                       <Button size="sm" variant="ghost" onClick={() => nav({ to: "/verifier/$telephone", params: { telephone: m.numero_membre } })} title="Aperçu carte / QR"><QrCode className="h-4 w-4" /></Button>
                       <Button size="sm" variant="ghost" onClick={() => nav({ to: "/print", search: { q: m.numero_membre } as any })} title="Imprimer carte"><Printer className="h-4 w-4" /></Button>
+                      {m.statut !== "actif" && <Button size="sm" variant="ghost" onClick={() => statusMut.mutate({ id: m.id, statut: "actif" })} title="Activer"><CheckCircle2 className="h-4 w-4 text-emerald-700" /></Button>}
+                      {m.statut !== "suspendu" && <Button size="sm" variant="ghost" onClick={() => statusMut.mutate({ id: m.id, statut: "suspendu" })} title="Suspendre"><PauseCircle className="h-4 w-4 text-amber-700" /></Button>}
+                      {m.statut !== "decede" && <Button size="sm" variant="ghost" onClick={() => statusMut.mutate({ id: m.id, statut: "decede" })} title="Marquer décédé"><Skull className="h-4 w-4 text-rose-700" /></Button>}
                       <Button size="sm" variant="ghost" onClick={() => {
                         if (confirm(`Supprimer ${m.prenoms} ${m.nom} ?`)) delMut.mutate(m.id);
                       }}><Trash2 className="h-4 w-4 text-rose-600" /></Button>
