@@ -46,6 +46,8 @@ function Page() {
   const [starting, setStarting] = useState(false);
   const [active, setActive] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [status, setStatus] = useState<string>("");
+  const [usedFallback, setUsedFallback] = useState(false);
   const scannerRef = useRef<{ stop: () => Promise<void>; clear: () => void } | null>(null);
   const fallbackRef = useRef<{ stop: () => void } | null>(null);
   const navigatingRef = useRef(false);
@@ -57,10 +59,13 @@ function Page() {
     };
   }, []);
 
-  function go(decoded: string) {
+  function go(decoded: string, via: "native" | "fallback" = "native") {
     const id = parseTelephone(decoded);
-    if (!id || navigatingRef.current) return;
+    if (!id) { setStatus("QR détecté mais illisible — réessayez."); return; }
+    if (navigatingRef.current) return;
     navigatingRef.current = true;
+    if (via === "fallback") setUsedFallback(true);
+    setStatus(`✓ Code détecté${via === "fallback" ? " (mode secours)" : ""} — vérification…`);
     fallbackRef.current?.stop();
     scannerRef.current?.stop().catch(() => {}).finally(() => {
       nav({ to: "/verifier/$telephone", params: { telephone: id } });
@@ -86,7 +91,7 @@ function Page() {
         ctx.drawImage(video, sx, sy, size, size, 0, 0, canvas.width, canvas.height);
         const img = ctx.getImageData(0, 0, canvas.width, canvas.height);
         const code = jsQR(img.data, img.width, img.height, { inversionAttempts: "attemptBoth" });
-        if (code?.data) { go(code.data); return; }
+        if (code?.data) { go(code.data, "fallback"); return; }
       }
       requestAnimationFrame(tick);
     };
@@ -94,8 +99,22 @@ function Page() {
     requestAnimationFrame(tick);
   }
 
+  const noDetectTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  async function stopAll() {
+    if (noDetectTimer.current) { clearTimeout(noDetectTimer.current); noDetectTimer.current = null; }
+    fallbackRef.current?.stop();
+    try { await scannerRef.current?.stop(); } catch { /* ignore */ }
+    try { scannerRef.current?.clear?.(); } catch { /* ignore */ }
+    scannerRef.current = null;
+    setActive(false);
+  }
+
   async function startCamera() {
     setError(null);
+    setStatus("Recherche d'un QR code…");
+    setUsedFallback(false);
+    navigatingRef.current = false;
     setStarting(true);
     try {
       const { Html5Qrcode } = await import("html5-qrcode");
@@ -120,17 +139,31 @@ function Page() {
             advanced: [{ focusMode: "continuous" }, { zoom: 1.5 } as any],
           },
         } as any,
-        (decoded) => go(decoded),
+        (decoded) => go(decoded, "native"),
         () => {},
       );
       startJsQrFallback();
       setActive(true);
+      if (noDetectTimer.current) clearTimeout(noDetectTimer.current);
+      noDetectTimer.current = setTimeout(() => {
+        if (!navigatingRef.current) {
+          setStatus("Aucun QR détecté. Rapprochez la carte, stabilisez, ou utilisez la saisie manuelle.");
+        }
+      }, 12000);
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : "Impossible d'accéder à la caméra.";
       setError(msg);
+      setStatus("");
     } finally {
       setStarting(false);
     }
+  }
+
+  async function retry() {
+    await stopAll();
+    setStatus("");
+    setUsedFallback(false);
+    await startCamera();
   }
 
   function onManual(e: React.FormEvent) {
@@ -163,6 +196,19 @@ function Page() {
                   {starting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ScanLine className="mr-2 h-4 w-4" />}
                   {starting ? "Démarrage…" : "Activer la caméra"}
                 </Button>
+              )}
+              {active && (
+                <div className="mt-3 space-y-2">
+                  {status && (
+                    <div className="rounded-md border border-primary/20 bg-primary/5 px-3 py-2 text-sm text-primary">
+                      {status}
+                      {usedFallback && <span className="ml-1 text-xs text-muted-foreground">(décodage de secours)</span>}
+                    </div>
+                  )}
+                  <Button type="button" variant="outline" size="sm" onClick={retry} className="w-full">
+                    <Loader2 className="mr-2 h-4 w-4" /> Réessayer le scan
+                  </Button>
+                </div>
               )}
               {error && <p className="mt-2 text-sm text-destructive">{error}</p>}
             </div>
