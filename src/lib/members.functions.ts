@@ -653,47 +653,71 @@ export const verifyMemberPublic = createServerFn({ method: "POST" })
     return { q: data.q.trim() };
   })
   .handler(async ({ data }) => {
-    let db: any;
+    const token = await authBearerFromRequest();
+    const clients: Array<{ name: string; db: any }> = [];
+    if (token) clients.push({ name: "authenticated", db: createBearerSupabaseClient(token) });
     try {
       const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
       // Force lazy proxy initialization here so missing env vars are caught.
       void (supabaseAdmin as any).from;
-      db = supabaseAdmin as any;
+      clients.push({ name: "service_role", db: supabaseAdmin as any });
     } catch (error) {
       console.warn("[verifyMemberPublic] admin client indisponible, bascule lecture publique", error);
-      db = createPublicSupabaseClient();
     }
-    let raw = data.q;
-    try {
-      const parsed = JSON.parse(raw);
-      raw = String(parsed?.n ?? parsed?.numero_membre ?? parsed?.telephone ?? raw);
-    } catch { /* QR texte classique */ }
-    const match = raw.match(/(?:\/m\/|\/verifier\/)([^/?#]+)/i);
-    if (match) raw = decodeURIComponent(match[1]);
-    const digits = normalizeDigits(raw);
-    let query = db
-      .from("members")
-      .select("id,numero_membre,photo_url,nom,prenoms,telephone,contact2,ville,quartier,adresse,date_naissance,lieu_naissance,date_inscription,statut")
-      .limit(1);
-    if (digits && digits.length >= 8) {
-      const pat = `%${digits}%`;
-      query = query.or(
-        `telephone.eq.${digits},contact2.eq.${digits},telephone.eq.${raw},contact2.eq.${raw},telephone.ilike.${pat},contact2.ilike.${pat},numero_membre.ilike.%${raw}%`,
-      );
-    } else {
-      query = query.or(`numero_membre.eq.${raw},numero_membre.ilike.%${raw}%,nom.ilike.%${raw}%,prenoms.ilike.%${raw}%`);
-    }
-    const { data: rows, error } = await query;
-    if (error) throw new Error(error.message);
-    if (rows?.[0]) return { member: rows[0] };
+    clients.push({ name: "public", db: createPublicSupabaseClient() });
 
-    const { data: fallbackRows, error: fallbackError } = await db
-      .from("members")
-      .select("id,numero_membre,photo_url,nom,prenoms,telephone,contact2,ville,quartier,adresse,date_naissance,lieu_naissance,date_inscription,statut,updated_at")
-      .order("updated_at", { ascending: false })
-      .limit(1500);
-    if (fallbackError) throw new Error(fallbackError.message);
-    return { member: (fallbackRows ?? []).find((m: any) => memberMatchesSearch(m, raw)) ?? null };
+    const candidates = verifierCandidates(data.q);
+    let lastError: any = null;
+
+    for (const { db } of clients) {
+      for (const raw of candidates) {
+        const digits = normalizeDigits(raw);
+        const safeRaw = raw.replace(/[%,]/g, " ").trim();
+        const directFilters = [
+          `numero_membre.eq.${safeRaw}`,
+          `matricule.eq.${safeRaw}`,
+          `numero_membre.ilike.%${safeRaw}%`,
+          `matricule.ilike.%${safeRaw}%`,
+          `nom.ilike.%${safeRaw}%`,
+          `prenoms.ilike.%${safeRaw}%`,
+        ];
+        if (digits.length >= 6) {
+          directFilters.unshift(
+            `telephone.eq.${digits}`,
+            `contact2.eq.${digits}`,
+            `telephone.eq.${safeRaw}`,
+            `contact2.eq.${safeRaw}`,
+            `telephone.ilike.%${digits}%`,
+            `contact2.ilike.%${digits}%`,
+            `numero_membre.ilike.%${digits}%`,
+            `matricule.ilike.%${digits}%`,
+          );
+        }
+        const { data: rows, error } = await db
+          .from("members")
+          .select(PUBLIC_MEMBER_SELECT)
+          .or(directFilters.join(","))
+          .order("updated_at", { ascending: false })
+          .limit(10);
+        if (error) { lastError = error; continue; }
+        const found = (rows ?? []).map(normalizePublicMember).find((m: any) => candidates.some((c) => memberMatchesSearch(m, c)));
+        if (found) return { member: found };
+      }
+
+      const { data: fallbackRows, error: fallbackError } = await db
+        .from("members")
+        .select(PUBLIC_MEMBER_SELECT)
+        .order("updated_at", { ascending: false })
+        .limit(PUBLIC_MEMBER_LIMIT);
+      if (fallbackError) { lastError = fallbackError; continue; }
+      const fallback = (fallbackRows ?? [])
+        .map(normalizePublicMember)
+        .find((m: any) => candidates.some((c) => memberMatchesSearch(m, c)));
+      if (fallback) return { member: fallback };
+    }
+
+    if (lastError) console.warn("[verifyMemberPublic] recherche sans résultat", lastError.message ?? lastError);
+    return { member: null };
   });
 
 /** Upload binaire base64 dans un bucket storage (admin). */
