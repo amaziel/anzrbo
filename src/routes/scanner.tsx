@@ -46,6 +46,8 @@ function Page() {
   const [starting, setStarting] = useState(false);
   const [active, setActive] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [status, setStatus] = useState<string>("");
+  const [usedFallback, setUsedFallback] = useState(false);
   const scannerRef = useRef<{ stop: () => Promise<void>; clear: () => void } | null>(null);
   const fallbackRef = useRef<{ stop: () => void } | null>(null);
   const navigatingRef = useRef(false);
@@ -57,10 +59,13 @@ function Page() {
     };
   }, []);
 
-  function go(decoded: string) {
+  function go(decoded: string, via: "native" | "fallback" = "native") {
     const id = parseTelephone(decoded);
-    if (!id || navigatingRef.current) return;
+    if (!id) { setStatus("QR détecté mais illisible — réessayez."); return; }
+    if (navigatingRef.current) return;
     navigatingRef.current = true;
+    if (via === "fallback") setUsedFallback(true);
+    setStatus(`✓ Code détecté${via === "fallback" ? " (mode secours)" : ""} — vérification…`);
     fallbackRef.current?.stop();
     scannerRef.current?.stop().catch(() => {}).finally(() => {
       nav({ to: "/verifier/$telephone", params: { telephone: id } });
