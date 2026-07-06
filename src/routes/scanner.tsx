@@ -99,8 +99,22 @@ function Page() {
     requestAnimationFrame(tick);
   }
 
+  const noDetectTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  async function stopAll() {
+    if (noDetectTimer.current) { clearTimeout(noDetectTimer.current); noDetectTimer.current = null; }
+    fallbackRef.current?.stop();
+    try { await scannerRef.current?.stop(); } catch { /* ignore */ }
+    try { scannerRef.current?.clear?.(); } catch { /* ignore */ }
+    scannerRef.current = null;
+    setActive(false);
+  }
+
   async function startCamera() {
     setError(null);
+    setStatus("Recherche d'un QR code…");
+    setUsedFallback(false);
+    navigatingRef.current = false;
     setStarting(true);
     try {
       const { Html5Qrcode } = await import("html5-qrcode");
@@ -130,12 +144,26 @@ function Page() {
       );
       startJsQrFallback();
       setActive(true);
+      if (noDetectTimer.current) clearTimeout(noDetectTimer.current);
+      noDetectTimer.current = setTimeout(() => {
+        if (!navigatingRef.current) {
+          setStatus("Aucun QR détecté. Rapprochez la carte, stabilisez, ou utilisez la saisie manuelle.");
+        }
+      }, 12000);
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : "Impossible d'accéder à la caméra.";
       setError(msg);
+      setStatus("");
     } finally {
       setStarting(false);
     }
+  }
+
+  async function retry() {
+    await stopAll();
+    setStatus("");
+    setUsedFallback(false);
+    await startCamera();
   }
 
   function onManual(e: React.FormEvent) {
