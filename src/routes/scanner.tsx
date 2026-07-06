@@ -91,7 +91,7 @@ function Page() {
         ctx.drawImage(video, sx, sy, size, size, 0, 0, canvas.width, canvas.height);
         const img = ctx.getImageData(0, 0, canvas.width, canvas.height);
         const code = jsQR(img.data, img.width, img.height, { inversionAttempts: "attemptBoth" });
-        if (code?.data) { go(code.data); return; }
+        if (code?.data) { go(code.data, "fallback"); return; }
       }
       requestAnimationFrame(tick);
     };
