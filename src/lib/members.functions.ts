@@ -1,4 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
+import { getRequest } from "@tanstack/react-start/server";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { createClient } from "@supabase/supabase-js";
 import type { Database } from "@/integrations/supabase/types";
@@ -66,6 +67,8 @@ async function assertAnyRole(supabase: any, userId: string, roles: string[]) {
 const SUPABASE_URL_FALLBACK = "https://ogseybvemtoxqpgpxewg.supabase.co";
 const SUPABASE_PUBLISHABLE_KEY_FALLBACK = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9nc2V5YnZlbXRveHFwZ3B4ZXdnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIzNzYyNDcsImV4cCI6MjA5Nzk1MjI0N30.16aClFbUFKk-VH2_CHY7P6kX3rU3IZ6uGEzK_LsNe54";
 const INLINE_UPLOAD_MAX_BYTES = 900_000;
+const PUBLIC_MEMBER_SELECT = "id,numero_membre,photo_url,nom,prenoms,telephone,contact2,ville,quartier,adresse,date_naissance,lieu_naissance,date_inscription,statut,updated_at";
+const PUBLIC_MEMBER_LIMIT = 5000;
 
 let cachedAdminClient: any | null | undefined;
 let loggedAdminClientWarning = false;
@@ -98,21 +101,84 @@ function createPublicSupabaseClient() {
   }) as any;
 }
 
+function createBearerSupabaseClient(token: string) {
+  const url = process.env.SUPABASE_URL ?? process.env.VITE_SUPABASE_URL ?? process.env.PROJECT_SUPABASE_URL ?? SUPABASE_URL_FALLBACK;
+  const key = process.env.SUPABASE_PUBLISHABLE_KEY ?? process.env.VITE_SUPABASE_PUBLISHABLE_KEY ?? process.env.VITE_SUPABASE_ANON_KEY ?? SUPABASE_PUBLISHABLE_KEY_FALLBACK;
+  return createClient<Database>(url, key, {
+    global: { headers: { Authorization: `Bearer ${token}` } },
+    auth: { storage: undefined, persistSession: false, autoRefreshToken: false },
+  }) as any;
+}
+
 function normalizeDigits(v?: string | null) {
   return String(v ?? "").replace(/\D/g, "");
 }
 
+function isZeroLikeDigits(v?: string | null) {
+  const d = normalizeDigits(v);
+  return d.length === 0 || /^0+$/.test(d);
+}
+
 function normalizeText(v?: string | null) {
-  return String(v ?? "").trim().toLowerCase();
+  return String(v ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toLowerCase();
 }
 
 function memberMatchesSearch(m: any, rawSearch: string) {
   const s = normalizeText(rawSearch);
   const digits = normalizeDigits(rawSearch);
+  if (!s && !digits) return false;
   const textFields = [m.numero_membre, m.matricule, m.nom, m.prenoms, m.telephone, m.contact2, m.ville, m.quartier, m.adresse]
     .map(normalizeText);
-  const digitFields = [m.telephone, m.contact2, m.numero_membre, m.matricule].map(normalizeDigits);
+  const digitFields = [m.telephone, m.contact2, m.numero_membre, m.matricule].filter((v) => !isZeroLikeDigits(v)).map(normalizeDigits);
   return textFields.some((v) => v.includes(s)) || (!!digits && digitFields.some((v) => v.includes(digits)));
+}
+
+function verifierCandidates(input: string) {
+  const out: string[] = [];
+  const add = (v: unknown) => {
+    const s = String(v ?? "").trim();
+    if (s && !out.includes(s) && !isZeroLikeDigits(s)) out.push(s);
+  };
+  add(input);
+  try {
+    const parsed = JSON.parse(input);
+    add(parsed?.n);
+    add(parsed?.numero_membre);
+    add(parsed?.telephone);
+    add(parsed?.contact2);
+  } catch { /* QR texte classique */ }
+  try {
+    const url = new URL(input, safeQrOrigin());
+    const m = url.pathname.match(/(?:\/m\/|\/verifier\/)([^/?#]+)/i);
+    if (m) add(decodeURIComponent(m[1]));
+    add(url.searchParams.get("t"));
+    add(url.searchParams.get("c"));
+    add(url.searchParams.get("telephone"));
+  } catch { /* pas une URL */ }
+  const match = input.match(/(?:\/m\/|\/verifier\/)([^/?#]+)/i);
+  if (match) add(decodeURIComponent(match[1]));
+  return out;
+}
+
+function authBearerFromRequest() {
+  try {
+    const auth = getRequest()?.headers?.get("authorization") ?? "";
+    return auth.startsWith("Bearer ") ? auth.slice(7).trim() : "";
+  } catch {
+    return "";
+  }
+}
+
+function normalizePublicMember(row: any) {
+  if (!row) return null;
+  return {
+    ...row,
+    numero_membre: row.numero_membre ?? row.matricule ?? "",
+    contact2: isZeroLikeDigits(row.contact2) ? null : row.contact2,
+    telephone: isZeroLikeDigits(row.telephone) ? "" : row.telephone,
+    statut: row.statut === "decede" ? "decede" : row.statut === "suspendu" || row.statut === "radie" || row.statut === "en_attente" ? "suspendu" : "actif",
+    date_inscription: row.date_inscription ?? row.created_at ?? null,
+  };
 }
 
 function safeQrOrigin() {
