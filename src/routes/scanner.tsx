@@ -197,6 +197,19 @@ function Page() {
                   {starting ? "Démarrage…" : "Activer la caméra"}
                 </Button>
               )}
+              {active && (
+                <div className="mt-3 space-y-2">
+                  {status && (
+                    <div className="rounded-md border border-primary/20 bg-primary/5 px-3 py-2 text-sm text-primary">
+                      {status}
+                      {usedFallback && <span className="ml-1 text-xs text-muted-foreground">(décodage de secours)</span>}
+                    </div>
+                  )}
+                  <Button type="button" variant="outline" size="sm" onClick={retry} className="w-full">
+                    <Loader2 className="mr-2 h-4 w-4" /> Réessayer le scan
+                  </Button>
+                </div>
+              )}
               {error && <p className="mt-2 text-sm text-destructive">{error}</p>}
             </div>
 
