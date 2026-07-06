@@ -671,6 +671,14 @@ export const verifyMemberPublic = createServerFn({ method: "POST" })
 
     for (const { db } of clients) {
       for (const raw of candidates) {
+        const { data: rpcRows, error: rpcError } = await db.rpc("verify_member_public", { p_q: raw });
+        if (!rpcError) {
+          const rpcFound = (Array.isArray(rpcRows) ? rpcRows : rpcRows ? [rpcRows] : [])
+            .map(normalizePublicMember)
+            .find((m: any) => candidates.some((c) => memberMatchesSearch(m, c)));
+          if (rpcFound) return { member: rpcFound };
+        }
+
         const digits = normalizeDigits(raw);
         const safeRaw = raw.replace(/[%,]/g, " ").trim();
         const directFilters = [
