@@ -29,10 +29,19 @@ function parseTelephone(raw: string): string | null {
   if (!v) return null;
   try {
     const parsed = JSON.parse(v);
+    if (parsed?.t) return String(parsed.t);
+    if (parsed?.c) return String(parsed.c);
     if (parsed?.n) return String(parsed.n);
     if (parsed?.numero_membre) return String(parsed.numero_membre);
     if (parsed?.telephone) return String(parsed.telephone);
   } catch { /* QR texte classique */ }
+  try {
+    const url = new URL(v, window.location.origin);
+    const t = url.searchParams.get("t") || url.searchParams.get("telephone") || url.searchParams.get("c");
+    if (t && !isZeroLike(t)) return t;
+    const pathMatch = url.pathname.match(/(?:\/m\/|\/verifier\/)([^/?#]+)/i);
+    if (pathMatch) return decodeURIComponent(pathMatch[1]);
+  } catch { /* pas une URL */ }
   const m = v.match(/(?:\/m\/|\/verifier\/)([^/?#]+)/i);
   if (m) return decodeURIComponent(m[1]);
   const cleaned = v.replace(/[^+\d]/g, "");

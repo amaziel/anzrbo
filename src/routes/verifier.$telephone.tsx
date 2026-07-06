@@ -39,7 +39,8 @@ function Page() {
   useEffect(() => {
     setLoading(true);
     let alive = true;
-    const load = () => verifyFn({ data: { q: raw } })
+    const lookup = typeof window !== "undefined" && window.location.search ? window.location.href : raw;
+    const load = () => verifyFn({ data: { q: lookup } })
       .then((r) => { if (alive) setRow(r.member); })
       .catch(() => { if (alive) setRow(null); })
       .finally(() => { if (alive) setLoading(false); });
@@ -49,7 +50,7 @@ function Page() {
     window.addEventListener("focus", onFocus);
     window.addEventListener("anzrbo:draft-restored", onDraftRestored);
     return () => { alive = false; window.removeEventListener("focus", onFocus); window.removeEventListener("anzrbo:draft-restored", onDraftRestored); };
-  }, [raw]);
+  }, [raw, verifyFn]);
   useEffect(() => {
     if (!loading && row && typeof window !== "undefined" && new URLSearchParams(window.location.search).get("print") === "1") {
       const t = window.setTimeout(() => window.print(), 700);
