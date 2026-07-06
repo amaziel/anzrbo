@@ -125,7 +125,7 @@ function Page() {
             advanced: [{ focusMode: "continuous" }, { zoom: 1.5 } as any],
           },
         } as any,
-        (decoded) => go(decoded),
+        (decoded) => go(decoded, "native"),
         () => {},
       );
       startJsQrFallback();
