@@ -1,5 +1,4 @@
 import { createServerFn } from "@tanstack/react-start";
-import { getRequest } from "@tanstack/react-start/server";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { createClient } from "@supabase/supabase-js";
 import type { Database } from "@/integrations/supabase/types";
@@ -160,8 +159,9 @@ function verifierCandidates(input: string) {
   return out;
 }
 
-function authBearerFromRequest() {
+async function authBearerFromRequest() {
   try {
+    const { getRequest } = await import("@tanstack/react-start/server");
     const auth = getRequest()?.headers?.get("authorization") ?? "";
     return auth.startsWith("Bearer ") ? auth.slice(7).trim() : "";
   } catch {
