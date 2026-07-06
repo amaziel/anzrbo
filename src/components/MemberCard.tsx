@@ -172,10 +172,10 @@ export function MemberCardRecto({ m }: { m: Membre }) {
         {/* (Espace réservé — déjà dans le bloc principal ci-dessus) */}
       </div>
 
-      <div className="absolute bottom-[4mm] left-[3mm] z-10 text-[2.3mm] font-extrabold tracking-[0.25em] text-white">
+      <div className="absolute bottom-[1.8mm] left-[3mm] z-10 text-[2.3mm] font-extrabold tracking-[0.25em] text-white">
         ANZRBO
       </div>
-      <div className="absolute bottom-[5mm] right-[7mm] z-10 flex items-center gap-[0.8mm] text-[1.7mm] font-bold tracking-wider text-white">
+      <div className="absolute bottom-[1.8mm] right-[4mm] z-10 flex items-center gap-[0.8mm] text-[1.9mm] font-bold tracking-wider text-white">
         CARTE DE MEMBRE
         <svg width="3.5mm" height="3.5mm" viewBox="0 0 24 24" fill="none" stroke="#c9a24c" strokeWidth="2.5"><path d="M12 2 4 6v6c0 5 3.5 9 8 10 4.5-1 8-5 8-10V6l-8-4z"/></svg>
       </div>
