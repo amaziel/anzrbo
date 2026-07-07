@@ -215,29 +215,45 @@ export const listMembers = createServerFn({ method: "POST" })
     const db = await getTrustedDbClient(context);
     const from = (data.page - 1) * data.pageSize;
     const to = from + data.pageSize - 1;
+
+    let q = db.from("members").select("*", { count: "exact" });
+    if (data.statut) q = q.eq("statut", data.statut);
+
     if (data.q) {
-      const { data: allRows, error: allError } = await db
-        .from("members")
-        .select("*")
-        .order("updated_at", { ascending: false })
-        .limit(1500);
-      if (allError) throw new Error(allError.message);
-      let filtered = (allRows ?? []).filter((m: any) => memberMatchesSearch(m, data.q));
-      if (data.statut) filtered = filtered.filter((m: any) => m.statut === data.statut);
-      const paged = filtered.slice(from, from + data.pageSize);
-      return { rows: paged as MemberRow[], total: filtered.length, page: data.page, pageSize: data.pageSize };
+      const raw = data.q.trim();
+      const digits = raw.replace(/\D/g, "");
+      // Escape %,_ and , for PostgREST or-filter values.
+      const esc = (v: string) => v.replace(/[%,_()]/g, " ").trim();
+      const like = `%${esc(raw)}%`;
+      const filters: string[] = [
+        `nom.ilike.${like}`,
+        `prenoms.ilike.${like}`,
+        `numero_membre.ilike.${like}`,
+        `matricule.ilike.${like}`,
+        `ville.ilike.${like}`,
+        `quartier.ilike.${like}`,
+        `adresse.ilike.${like}`,
+      ];
+      if (digits && digits.length >= 3) {
+        const dlike = `%${digits}%`;
+        filters.push(`telephone.ilike.${dlike}`);
+        filters.push(`contact2.ilike.${dlike}`);
+      }
+      q = q.or(filters.join(","));
     }
 
-    let q = db
-      .from("members")
-      .select("*", { count: "exact" })
-      .order("created_at", { ascending: false })
-      .range(from, to);
-    if (data.statut) q = q.eq("statut", data.statut);
+    q = q.order("updated_at", { ascending: false }).range(from, to);
     const { data: rows, count, error } = await q;
-    if (error) throw new Error(error.message);
+    if (error) {
+      // Fallback client-side scan si le filtre .or échoue (colonne absente, etc.)
+      const { data: allRows } = await db.from("members").select("*").order("updated_at", { ascending: false }).limit(1500);
+      let filtered = (allRows ?? []).filter((m: any) => memberMatchesSearch(m, data.q));
+      if (data.statut) filtered = filtered.filter((m: any) => m.statut === data.statut);
+      return { rows: filtered.slice(from, from + data.pageSize) as MemberRow[], total: filtered.length, page: data.page, pageSize: data.pageSize };
+    }
     return { rows: (rows ?? []) as MemberRow[], total: count ?? 0, page: data.page, pageSize: data.pageSize };
   });
+
 
 export const getMemberStats = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
