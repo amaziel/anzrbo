@@ -54,16 +54,82 @@ const workflow = [
   { icon: FileCheck2, title: "Dossier décès", text: "Guide officiel pour préparer rapidement les pièces nécessaires." },
 ];
 
+const heroImages: { src: string; caption: string }[] = [
+  { src: hero1, caption: "Assemblée sous les manguiers — Bonon" },
+  { src: hero2, caption: "Remise de l'assistance à une famille endeuillée" },
+  { src: hero3, caption: "Grande rencontre communautaire N'Zipris" },
+  { src: hero4, caption: "Équipe dirigeante de l'ANZRBO" },
+  { src: hero5, caption: "Réunion de coordination du bureau" },
+  { src: hero6, caption: "Solidarité entre aînés — poignée de main" },
+];
+
+const temoignages = [
+  { auteur: "Aya K.", role: "Membre à Bonon", texte: "Grâce à l'ANZRBO, notre famille a reçu l'assistance en moins de 48h. Une organisation exemplaire." },
+  { auteur: "Kouassi B.", role: "Délégué de section", texte: "La plateforme rend le suivi des cotisations transparent et rapide. Un vrai gain pour le bureau." },
+  { auteur: "Mariam D.", role: "Ayant droit", texte: "Le QR sur la carte de mon père a permis de tout vérifier immédiatement. Impressionnant." },
+];
+
+function HeroCarousel() {
+  const [api, setApi] = useState<CarouselApi | null>(null);
+  const [current, setCurrent] = useState(0);
+  useEffect(() => {
+    if (!api) return;
+    const onSelect = () => setCurrent(api.selectedScrollSnap());
+    api.on("select", onSelect);
+    onSelect();
+    const id = setInterval(() => { api.scrollNext(); }, 4500);
+    return () => { clearInterval(id); api.off("select", onSelect); };
+  }, [api]);
+
+  return (
+    <div className="relative">
+      <Carousel setApi={setApi} opts={{ loop: true, align: "start" }} className="overflow-hidden rounded-2xl border bg-card shadow-2xl">
+        <CarouselContent>
+          {heroImages.map((img, i) => (
+            <CarouselItem key={img.src}>
+              <div className="relative aspect-[4/3] w-full sm:aspect-[16/10]">
+                <img
+                  src={img.src}
+                  alt={img.caption}
+                  width={1600}
+                  height={900}
+                  loading={i === 0 ? "eager" : "lazy"}
+                  className="h-full w-full object-cover"
+                />
+                <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 via-black/25 to-transparent p-4 text-white">
+                  <p className="text-sm font-medium md:text-base">{img.caption}</p>
+                </div>
+              </div>
+            </CarouselItem>
+          ))}
+        </CarouselContent>
+        <CarouselPrevious className="left-3 hidden sm:flex" />
+        <CarouselNext className="right-3 hidden sm:flex" />
+      </Carousel>
+      <div className="mt-3 flex items-center justify-center gap-1.5">
+        {heroImages.map((_, i) => (
+          <button
+            key={i}
+            aria-label={`Aller à l'image ${i + 1}`}
+            onClick={() => api?.scrollTo(i)}
+            className={`h-1.5 rounded-full transition-all ${i === current ? "w-6 bg-primary" : "w-2 bg-muted"}`}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function Index() {
   return (
     <div className="min-h-screen bg-background">
       <SiteHeader />
 
       <section className="border-b bg-gradient-to-b from-secondary/45 via-background to-background">
-        <div className="container mx-auto grid max-w-7xl items-center gap-10 px-4 py-12 md:grid-cols-[1.08fr_0.92fr] md:py-20">
+        <div className="container mx-auto grid max-w-7xl items-center gap-10 px-4 py-12 md:grid-cols-[1.05fr_0.95fr] md:py-16">
           <div>
-            <span className="inline-flex items-center rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold uppercase tracking-wider text-primary">
-              Association d'entraide
+            <span className="inline-flex items-center gap-2 rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold uppercase tracking-wider text-primary">
+              <MapPin className="h-3.5 w-3.5" /> Sous-préfecture de Bonon · Côte d'Ivoire
             </span>
             <h1 className="mt-5 text-4xl font-bold leading-tight tracking-tight text-foreground md:text-5xl lg:text-6xl">
               <span className="text-primary">ANZRBO</span> — l'entraide{" "}
@@ -98,24 +164,49 @@ function Index() {
             </p>
           </div>
 
-          <div className="relative">
-            <div className="rounded-lg border bg-card p-6 shadow-xl md:p-8">
-              <img src={logo} alt="Association ANZRBO — Entraide et Solidarité" className="mx-auto h-32 w-auto md:h-44" />
-              <p className="mt-6 text-center text-sm italic text-muted-foreground">
-                « Unis dans la solidarité, forts dans l'entraide »
-              </p>
-              <div className="mt-6 grid grid-cols-2 gap-4">
-                {stats.map((s) => (
-                  <div key={s.label} className="rounded-lg bg-secondary/60 p-4 text-center">
-                    <div className="text-xl font-bold text-primary md:text-2xl">{s.value}</div>
-                    <div className="text-xs text-muted-foreground">{s.label}</div>
-                  </div>
-                ))}
+          <div>
+            <HeroCarousel />
+          </div>
+        </div>
+
+        <div className="container mx-auto max-w-7xl px-4 pb-10">
+          <div className="grid grid-cols-2 gap-3 rounded-xl border bg-card/70 p-4 shadow-sm md:grid-cols-4">
+            {stats.map((s) => (
+              <div key={s.label} className="rounded-lg bg-secondary/60 p-4 text-center">
+                <div className="text-xl font-bold text-primary md:text-2xl">{s.value}</div>
+                <div className="text-xs text-muted-foreground">{s.label}</div>
               </div>
-            </div>
+            ))}
           </div>
         </div>
       </section>
+
+      <section className="border-b">
+        <div className="container mx-auto max-w-7xl px-4 py-14">
+          <div className="mb-8 flex flex-col items-start justify-between gap-3 md:flex-row md:items-end">
+            <div>
+              <p className="text-sm font-semibold uppercase tracking-wider text-primary">Témoignages</p>
+              <h2 className="mt-1 text-3xl font-bold tracking-tight">Une communauté qui se serre les coudes</h2>
+            </div>
+            <div className="inline-flex items-center gap-2 text-sm text-muted-foreground">
+              <CalendarDays className="h-4 w-4 text-primary" /> Depuis plusieurs années au service des familles
+            </div>
+          </div>
+          <div className="grid gap-4 md:grid-cols-3">
+            {temoignages.map((t) => (
+              <div key={t.auteur} className="relative rounded-xl border bg-card p-6 shadow-sm">
+                <Quote className="absolute right-4 top-4 h-6 w-6 text-primary/20" />
+                <p className="text-sm italic text-foreground">« {t.texte} »</p>
+                <div className="mt-4 text-sm">
+                  <div className="font-semibold text-foreground">{t.auteur}</div>
+                  <div className="text-xs text-muted-foreground">{t.role}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
 
       <section className="border-b bg-secondary/25">
         <div className="container mx-auto grid max-w-7xl gap-6 px-4 py-12 lg:grid-cols-[0.8fr_1.2fr] lg:items-center">
