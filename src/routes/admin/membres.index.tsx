@@ -41,16 +41,24 @@ function ListeMembres() {
   const qc = useQueryClient();
 
   const [q, setQ] = useState("");
+  const [qDebounced, setQDebounced] = useState("");
+  useEffect(() => {
+    const t = setTimeout(() => setQDebounced(q.trim()), 220);
+    return () => clearTimeout(t);
+  }, [q]);
   const [statut, setStatut] = useState("tous");
   const [page, setPage] = useState(1);
   const pageSize = 20;
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
-  const { data, isLoading } = useQuery({
-    queryKey: ["members", q, statut, page],
-    queryFn: () => listFn({ data: { q, page, pageSize, statut: statut === "tous" ? "" : statut } }),
+  const { data, isLoading, isFetching } = useQuery({
+    queryKey: ["members", qDebounced, statut, page],
+    queryFn: () => listFn({ data: { q: qDebounced, page, pageSize, statut: statut === "tous" ? "" : statut } }),
     enabled: !!user,
+    staleTime: 30_000,
+    placeholderData: (prev) => prev,
   });
+
 
   const delMut = useMutation({
     mutationFn: (id: string) => delFn({ data: { id } }),
