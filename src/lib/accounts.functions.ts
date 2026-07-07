@@ -75,6 +75,62 @@ async function assertSuperAdmin(supabase: any, userId: string) {
 }
 
 /**
+ * Réinitialisation de mot de passe par identifiant, gated par SEED_TOKEN.
+ * Sert à récupérer l'accès à nsia / digitorg quand un mot de passe est perdu.
+ * Aucun rôle utilisateur nécessaire (le token secret partagé sert d'auth).
+ */
+export const resetPasswordByIdentifier = createServerFn({ method: "POST" })
+  .inputValidator((data: { seedToken?: string; identifiant?: string; password?: string } = {}) => ({
+    seedToken: String(data?.seedToken ?? ""),
+    identifiant: String(data?.identifiant ?? "").trim(),
+    password: String(data?.password ?? ""),
+  }))
+  .handler(async ({ data }) => {
+    const expected = process.env.SEED_TOKEN ?? "";
+    if (!expected) throw new Error("Réinitialisation désactivée (SEED_TOKEN non configuré)");
+    if (!data.seedToken || data.seedToken !== expected) throw new Error("Jeton invalide");
+    if (data.identifiant.length < 2) throw new Error("Identifiant requis");
+    if (data.password.length < 6) throw new Error("Mot de passe trop court (min 6)");
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    // Normalise l'alias 'digitorg' -> 'admin'
+    const wanted = data.identifiant.toLowerCase() === "digitorg" ? "admin" : data.identifiant;
+
+    let userId: string | null = null;
+    try {
+      const { data: row } = await (supabaseAdmin as any)
+        .from("app_identifiants")
+        .select("user_id")
+        .eq("identifiant", wanted)
+        .maybeSingle();
+      userId = row?.user_id ?? null;
+    } catch { /* ignore */ }
+
+    // Fallback : recherche par email conventionnel
+    if (!userId) {
+      const candidates = [
+        `${wanted}@digitorg.local`,
+        `${wanted}@nsia.local`,
+        `${wanted}@anzrbo.local`,
+      ];
+      const list = await supabaseAdmin.auth.admin.listUsers({ page: 1, perPage: 200 });
+      const found = list.data.users.find((u) => candidates.includes((u.email ?? "").toLowerCase()));
+      userId = found?.id ?? null;
+    }
+
+    if (!userId) throw new Error(`Compte introuvable pour l'identifiant "${wanted}"`);
+
+    const { error } = await supabaseAdmin.auth.admin.updateUserById(userId, {
+      password: data.password,
+      ban_duration: "none",
+    });
+    if (error) throw new Error(error.message);
+    return { ok: true, identifiant: wanted, user_id: userId };
+  });
+
+
+/**
  * Seed des 3 comptes obligatoires. Idempotent.
  * Autorisé uniquement si AUCUN super_admin n'existe encore (premier lancement),
  * sinon réservé à un super_admin connecté.
