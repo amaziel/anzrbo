@@ -181,6 +181,13 @@ function normalizePublicMember(row: any) {
   };
 }
 
+/** Retire les données personnelles sensibles avant exposition publique. */
+function stripPublicPii(m: any) {
+  if (!m) return null;
+  const { date_naissance: _dn, lieu_naissance: _ln, adresse: _ad, quartier: _qu, ...safe } = m;
+  return safe;
+}
+
 function safeQrOrigin() {
   return (process.env.PUBLIC_SITE_URL ?? "https://anzrbo1.lovable.app").replace(/\/$/, "");
 }
@@ -692,7 +699,7 @@ export const verifyMemberPublic = createServerFn({ method: "POST" })
           const rpcFound = (Array.isArray(rpcRows) ? rpcRows : rpcRows ? [rpcRows] : [])
             .map(normalizePublicMember)
             .find((m: any) => candidates.some((c) => memberMatchesSearch(m, c)));
-          if (rpcFound) return { member: rpcFound };
+          if (rpcFound) return { member: stripPublicPii(rpcFound) };
         }
 
         const digits = normalizeDigits(raw);
@@ -725,7 +732,7 @@ export const verifyMemberPublic = createServerFn({ method: "POST" })
           .limit(10);
         if (error) { lastError = error; continue; }
         const found = (rows ?? []).map(normalizePublicMember).find((m: any) => candidates.some((c) => memberMatchesSearch(m, c)));
-        if (found) return { member: found };
+        if (found) return { member: stripPublicPii(found) };
       }
 
       const { data: fallbackRows, error: fallbackError } = await db
@@ -737,7 +744,7 @@ export const verifyMemberPublic = createServerFn({ method: "POST" })
       const fallback = (fallbackRows ?? [])
         .map(normalizePublicMember)
         .find((m: any) => candidates.some((c) => memberMatchesSearch(m, c)));
-      if (fallback) return { member: fallback };
+      if (fallback) return { member: stripPublicPii(fallback) };
     }
 
     if (lastError) console.warn("[verifyMemberPublic] recherche sans résultat", lastError.message ?? lastError);
