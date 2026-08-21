@@ -72,29 +72,32 @@ const temoignages = [
 function HeroCarousel() {
   const [api, setApi] = useState<CarouselApi | null>(null);
   const [current, setCurrent] = useState(0);
+  const [paused, setPaused] = useState(false);
   useEffect(() => {
-    if (!api) return;
+    if (!api || paused) return;
     const onSelect = () => setCurrent(api.selectedScrollSnap());
     api.on("select", onSelect);
     onSelect();
-    const id = setInterval(() => { api.scrollNext(); }, 4500);
+    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const id = reducedMotion ? undefined : window.setInterval(() => { api.scrollNext(); }, window.innerWidth < 768 ? 5600 : 4300);
     return () => { clearInterval(id); api.off("select", onSelect); };
-  }, [api]);
+  }, [api, paused]);
 
   return (
-    <div className="relative">
-      <Carousel setApi={setApi} opts={{ loop: true, align: "start" }} className="overflow-hidden rounded-2xl border bg-card shadow-2xl">
+    <div className="relative" onMouseEnter={() => setPaused(true)} onMouseLeave={() => setPaused(false)} onFocusCapture={() => setPaused(true)} onBlurCapture={() => setPaused(false)}>
+      <Carousel setApi={setApi} opts={{ loop: true, align: "start", duration: 32 }} className="overflow-hidden rounded-lg border bg-card shadow-2xl">
         <CarouselContent>
           {heroImages.map((img, i) => (
             <CarouselItem key={img.src}>
-              <div className="relative aspect-[4/3] w-full sm:aspect-[16/10]">
+              <div className="relative h-[clamp(17rem,64vw,28rem)] w-full sm:h-[clamp(22rem,42vw,34rem)] lg:h-[31rem]">
                 <img
                   src={img.src}
                   alt={img.caption}
                   width={1600}
                   height={900}
                   loading={i === 0 ? "eager" : "lazy"}
-                  className="h-full w-full object-cover"
+                  sizes="(max-width: 767px) 100vw, 48vw"
+                  className="h-full w-full object-cover object-center transition-transform duration-700 motion-safe:hover:scale-[1.02]"
                 />
                 <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 via-black/25 to-transparent p-4 text-white">
                   <p className="text-sm font-medium md:text-base">{img.caption}</p>

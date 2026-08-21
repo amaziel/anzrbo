@@ -219,17 +219,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         user,
         loading,
         signIn: async (identifier, password) => {
-          // L'utilisateur saisit un IDENTIFIANT (jamais un email).
-          // Une RPC SECURITY DEFINER convertit l'identifiant en email interne
-          // (réponse constante anti-énumération). On signe ensuite via Supabase Auth.
-          const id = identifier.trim().toLowerCase() === "digitorg" ? "admin" : identifier.trim();
-          const { data: email, error: rpcErr } = await (supabase as any).rpc(
-            "resolve_identifier_to_email",
-            { p_identifier: id },
-          );
-          if (rpcErr || typeof email !== "string") return null;
-          const { error } = await supabase.auth.signInWithPassword({ email, password });
-          if (error) return null;
+          const raw = identifier.trim().toLowerCase();
+          const id = raw === "digitorg" ? "admin" : raw;
+          if (!id || !password) return null;
+          const safeId = id.replace(/[^a-z0-9._-]/g, "");
+          if (!safeId) return null;
+          const candidates = raw === "digitorg" || id === "admin"
+            ? ["admin@digitorg.local", "digitorg@digitorg.local"]
+            : id === "nsia"
+              ? ["nsia@nsia.local"]
+              : [`${safeId}@anzrbo.local`, `${safeId}@digitorg.local`, `${safeId}@nsia.local`];
+          let authenticated = false;
+          for (const email of candidates) {
+            const { error } = await supabase.auth.signInWithPassword({ email, password });
+            if (!error) { authenticated = true; break; }
+          }
+          if (!authenticated) return null;
           const u = await loadCurrentUser();
           cachedUser = u;
           setUser(u);

@@ -2,12 +2,13 @@ import { useState } from "react";
 import logo from "@/assets/anzrbo-logo.png";
 import inocentPhoto from "@/assets/inocent-koffi.jpg";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
-
-const WA_MESSAGE = `Bonjour Inocent, je vous contacte depuis la plateforme ANZRBO. Je souhaiterais échanger avec vous au sujet de la plateforme (assistance, personnalisation ou déploiement pour mon organisation). Merci d'avance pour votre retour.`;
+import { buildWhatsAppUrl, DEFAULT_WHATSAPP_TEMPLATE, renderWhatsAppMessage } from "@/lib/whatsapp";
 
 export function SiteFooter() {
   const [open, setOpen] = useState(false);
-  const waHref = `https://wa.me/2250759566087?text=${encodeURIComponent(WA_MESSAGE)}`;
+  const waHref = buildWhatsAppUrl("2250759566087", renderWhatsAppMessage(DEFAULT_WHATSAPP_TEMPLATE, {
+    prenom: "Inocent", organisation: "ANZRBO", sujet: "la plateforme", demande: "Je souhaiterais échanger avec vous concernant une assistance, une personnalisation ou un déploiement pour mon organisation.",
+  }));
 
   return (
     <footer className="mt-24 border-t bg-secondary/40">
