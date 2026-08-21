@@ -66,7 +66,7 @@ async function assertAnyRole(supabase: any, userId: string, roles: string[]) {
 const SUPABASE_URL_FALLBACK = "https://ogseybvemtoxqpgpxewg.supabase.co";
 const SUPABASE_PUBLISHABLE_KEY_FALLBACK = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9nc2V5YnZlbXRveHFwZ3B4ZXdnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIzNzYyNDcsImV4cCI6MjA5Nzk1MjI0N30.16aClFbUFKk-VH2_CHY7P6kX3rU3IZ6uGEzK_LsNe54";
 const INLINE_UPLOAD_MAX_BYTES = 900_000;
-const PUBLIC_MEMBER_SELECT = "id,numero_membre,photo_url,nom,prenoms,telephone,contact2,ville,quartier,adresse,date_naissance,lieu_naissance,date_inscription,statut,updated_at";
+const PUBLIC_MEMBER_SELECT = "id,numero_membre,photo_url,nom,prenoms,telephone,contact2,ville,date_inscription,statut,updated_at";
 const PUBLIC_MEMBER_LIMIT = 5000;
 
 let cachedAdminClient: any | null | undefined;
@@ -179,6 +179,13 @@ function normalizePublicMember(row: any) {
     statut: row.statut === "decede" ? "decede" : row.statut === "suspendu" || row.statut === "radie" || row.statut === "en_attente" ? "suspendu" : "actif",
     date_inscription: row.date_inscription ?? row.created_at ?? null,
   };
+}
+
+/** Retire les données personnelles sensibles avant exposition publique. */
+function stripPublicPii(m: any) {
+  if (!m) return null;
+  const { date_naissance: _dn, lieu_naissance: _ln, adresse: _ad, quartier: _qu, ...safe } = m;
+  return safe;
 }
 
 function safeQrOrigin() {
@@ -692,7 +699,7 @@ export const verifyMemberPublic = createServerFn({ method: "POST" })
           const rpcFound = (Array.isArray(rpcRows) ? rpcRows : rpcRows ? [rpcRows] : [])
             .map(normalizePublicMember)
             .find((m: any) => candidates.some((c) => memberMatchesSearch(m, c)));
-          if (rpcFound) return { member: rpcFound };
+          if (rpcFound) return { member: stripPublicPii(rpcFound) };
         }
 
         const digits = normalizeDigits(raw);
@@ -725,7 +732,7 @@ export const verifyMemberPublic = createServerFn({ method: "POST" })
           .limit(10);
         if (error) { lastError = error; continue; }
         const found = (rows ?? []).map(normalizePublicMember).find((m: any) => candidates.some((c) => memberMatchesSearch(m, c)));
-        if (found) return { member: found };
+        if (found) return { member: stripPublicPii(found) };
       }
 
       const { data: fallbackRows, error: fallbackError } = await db
@@ -737,7 +744,7 @@ export const verifyMemberPublic = createServerFn({ method: "POST" })
       const fallback = (fallbackRows ?? [])
         .map(normalizePublicMember)
         .find((m: any) => candidates.some((c) => memberMatchesSearch(m, c)));
-      if (fallback) return { member: fallback };
+      if (fallback) return { member: stripPublicPii(fallback) };
     }
 
     if (lastError) console.warn("[verifyMemberPublic] recherche sans résultat", lastError.message ?? lastError);

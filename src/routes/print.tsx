@@ -39,8 +39,8 @@ function PrintPage() {
   const m = row ? {
     id: row.id, numeroMembre: row.numero_membre, photoUrl: row.photo_url,
     nom: row.nom, prenoms: row.prenoms, telephone: row.telephone, contact2: row.contact2 ?? undefined,
-    sousPrefecture: "Bonon" as const, village: row.quartier || row.ville || "Bonon", quartier: row.adresse ?? undefined,
-    dateNaissance: row.date_naissance || "", lieuNaissance: row.lieu_naissance || "",
+    sousPrefecture: "Bonon" as const, village: row.ville || "Bonon", quartier: undefined,
+    dateNaissance: "", lieuNaissance: "",
     dateInscription: row.date_inscription || new Date().toISOString(),
     statut: row.statut || "actif",
     urgence: { nom: "", contact1: "", adresse: "" },
