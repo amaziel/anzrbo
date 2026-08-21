@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Printer, Search } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
 import { verifyMemberPublic } from "@/lib/members.functions";
 import { MemberCardRecto, MemberCardVerso } from "@/components/MemberCard";
 
@@ -48,7 +49,7 @@ function PrintPage() {
   } : null;
 
   return (
-    <div className="min-h-screen bg-[#f7f3e9]">
+    <div className="min-h-screen bg-secondary/40">
       <style>{`
         @page { size: 85.6mm 53.98mm; margin: 0 }
         @media print {
@@ -69,7 +70,8 @@ function PrintPage() {
           <Button variant="outline" onClick={() => window.print()} disabled={!m}><Printer className="mr-2 h-4 w-4" /> Imprimer</Button>
         </div>
 
-        {err && <Card className="no-print border-red-200"><CardContent className="p-6 text-sm text-destructive">{err}</CardContent></Card>}
+         {loading && <div className="no-print space-y-4" aria-label="Recherche en cours"><Skeleton className="mx-auto aspect-[1.586/1] w-full max-w-[540px]" /><Skeleton className="mx-auto aspect-[1.586/1] w-full max-w-[540px]" /></div>}
+         {err && <Card className="no-print border-destructive/30"><CardContent className="p-6 text-sm text-destructive">{err}</CardContent></Card>}
 
         {m && (
           <div className="flex flex-col items-center gap-6">
