@@ -122,15 +122,25 @@ function normalizeText(v?: string | null) {
   return String(v ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toLowerCase();
 }
 
+/** Clé téléphone tolérante aux formats (+225, espaces, 0 initial) : 8 derniers chiffres. */
+function phoneKey(v?: string | null) {
+  const d = normalizeDigits(v);
+  return d.length >= 8 ? d.slice(-8) : d;
+}
+
 function memberMatchesSearch(m: any, rawSearch: string) {
   const s = normalizeText(rawSearch);
   const digits = normalizeDigits(rawSearch);
+  const pk = phoneKey(rawSearch);
   if (!s && !digits) return false;
   const textFields = [m.numero_membre, m.matricule, m.nom, m.prenoms, m.telephone, m.contact2, m.ville, m.quartier, m.adresse]
     .map(normalizeText);
   const digitFields = [m.telephone, m.contact2, m.numero_membre, m.matricule].filter((v) => !isZeroLikeDigits(v)).map(normalizeDigits);
-  return textFields.some((v) => v.includes(s)) || (!!digits && digitFields.some((v) => v.includes(digits)));
+  if (textFields.some((v) => v.includes(s))) return true;
+  if (digits && digitFields.some((v) => v.includes(digits))) return true;
+  return pk.length >= 8 && digitFields.some((v) => v.includes(pk));
 }
+
 
 function verifierCandidates(input: string) {
   const out: string[] = [];
@@ -242,10 +252,11 @@ export const listMembers = createServerFn({ method: "POST" })
         `adresse.ilike.${like}`,
       ];
       if (digits && digits.length >= 3) {
-        const dlike = `%${digits}%`;
+        const dlike = `%${phoneKey(digits)}%`;
         filters.push(`telephone.ilike.${dlike}`);
         filters.push(`contact2.ilike.${dlike}`);
       }
+
       q = q.or(filters.join(","));
     }
 
@@ -694,15 +705,8 @@ export const verifyMemberPublic = createServerFn({ method: "POST" })
 
     for (const { db } of clients) {
       for (const raw of candidates) {
-        const { data: rpcRows, error: rpcError } = await db.rpc("verify_member_public", { p_q: raw });
-        if (!rpcError) {
-          const rpcFound = (Array.isArray(rpcRows) ? rpcRows : rpcRows ? [rpcRows] : [])
-            .map(normalizePublicMember)
-            .find((m: any) => candidates.some((c) => memberMatchesSearch(m, c)));
-          if (rpcFound) return { member: stripPublicPii(rpcFound) };
-        }
-
         const digits = normalizeDigits(raw);
+        const pk = phoneKey(raw);
         const safeRaw = raw.replace(/[%,]/g, " ").trim();
         const directFilters = [
           `numero_membre.eq.${safeRaw}`,
@@ -714,16 +718,17 @@ export const verifyMemberPublic = createServerFn({ method: "POST" })
         ];
         if (digits.length >= 6) {
           directFilters.unshift(
+            `telephone.ilike.%${pk}%`,
+            `contact2.ilike.%${pk}%`,
             `telephone.eq.${digits}`,
             `contact2.eq.${digits}`,
-            `telephone.eq.${safeRaw}`,
-            `contact2.eq.${safeRaw}`,
             `telephone.ilike.%${digits}%`,
             `contact2.ilike.%${digits}%`,
             `numero_membre.ilike.%${digits}%`,
             `matricule.ilike.%${digits}%`,
           );
         }
+
         const { data: rows, error } = await db
           .from("members")
           .select(PUBLIC_MEMBER_SELECT)

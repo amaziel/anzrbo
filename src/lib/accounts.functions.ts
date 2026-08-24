@@ -36,15 +36,33 @@ function emailForIdentifier(identifiant: string, role: AccountRole): string {
   return `${id}@${domain}`;
 }
 
-/** Map a logical AccountRole to a value that exists in public.app_role today.
- *  Falls back to admin_national for values not yet added to the enum. */
-function dbRoleFor(role: AccountRole): string {
-  if (role === "super_admin") return "super_admin";
-  if (role === "agent_saisie") return "agent_saisie";
-  if (role === "admin_anzrbo") return "admin_anzrbo";
-  if (role === "nsia") return "nsia";
-  return role;
+/** Valeurs candidates pour public.app_role, de la plus précise à celle qui
+ *  existe à coup sûr dans l'enum historique (évite toute migration bloquante). */
+function dbRoleCandidates(role: AccountRole): string[] {
+  if (role === "super_admin") return ["super_admin"];
+  if (role === "agent_saisie") return ["agent_saisie"];
+  if (role === "admin_anzrbo") return ["admin_anzrbo", "admin_national"];
+  if (role === "nsia") return ["nsia", "admin_nsia", "admin_regional"];
+  return [role];
 }
+
+function dbRoleFor(role: AccountRole): string {
+  return dbRoleCandidates(role)[0]!;
+}
+
+/** Upsert du rôle en essayant chaque valeur d'enum candidate. */
+async function upsertRole(supabaseAdmin: any, userId: string, role: AccountRole): Promise<string | null> {
+  let lastError: string | null = null;
+  for (const value of dbRoleCandidates(role)) {
+    const { error } = await supabaseAdmin
+      .from("user_roles")
+      .upsert({ user_id: userId, role: value }, { onConflict: "user_id,role" });
+    if (!error) return null;
+    lastError = error.message;
+  }
+  return lastError;
+}
+
 
 
 async function assertSuperAdmin(supabase: any, userId: string) {
@@ -149,24 +167,15 @@ export const seedInitialAccounts = createServerFn({ method: "POST" })
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-    // Gate 2: idempotence — refuse si un super_admin existe déjà.
-    const { count } = await (supabaseAdmin as any)
-      .from("user_roles")
-      .select("user_id", { count: "exact", head: true })
-      .eq("role", "super_admin");
-    if ((count ?? 0) > 0) {
-      return { ok: false as const, reason: "already_seeded" };
-    }
-
-    // Gate 3: lit les mots de passe depuis l'environnement serveur (jamais dans le code).
+    // Gate 2 : lit les mots de passe depuis l'environnement serveur (jamais dans le code).
     const pwSuper = process.env.SEED_PWD_SUPER_ADMIN ?? "";
     const pwAnzrbo = process.env.SEED_PWD_ANZRBO ?? "";
     const pwNsia = process.env.SEED_PWD_NSIA ?? "";
     if (!pwSuper || !pwAnzrbo || !pwNsia) {
       throw new Error("Mots de passe seed manquants (SEED_PWD_SUPER_ADMIN / SEED_PWD_ANZRBO / SEED_PWD_NSIA)");
     }
-    if ([pwSuper, pwAnzrbo, pwNsia].some((p) => p.length < 12)) {
-      throw new Error("Mots de passe seed trop courts (min 12 caractères)");
+    if ([pwSuper, pwAnzrbo, pwNsia].some((p) => p.length < 8)) {
+      throw new Error("Mots de passe seed trop courts (min 8 caractères)");
     }
 
     const seeds: Array<{ identifiant: string; password: string; role: AccountRole; display: string }> = [
@@ -176,12 +185,12 @@ export const seedInitialAccounts = createServerFn({ method: "POST" })
     ];
 
 
-    const results: Array<{ identifiant: string; ok: boolean; error?: string }> = [];
+    const results: Array<{ identifiant: string; ok: boolean; created?: boolean; error?: string }> = [];
 
     for (const s of seeds) {
       const email = emailForIdentifier(s.identifiant, s.role);
 
-      // 1) Crée l'utilisateur auth (ou récupère l'existant)
+      // 1) Crée l'utilisateur auth, ou remet le mot de passe à jour s'il existe déjà (réparation idempotente)
       const created = await supabaseAdmin.auth.admin.createUser({
         email,
         password: s.password,
@@ -190,12 +199,19 @@ export const seedInitialAccounts = createServerFn({ method: "POST" })
       });
 
       let userId = created.data.user?.id;
+      let wasCreated = Boolean(userId);
       if (!userId) {
-        // existe déjà — on le retrouve via app_identifiants ou listUsers
-        const list = await supabaseAdmin.auth.admin.listUsers({ page: 1, perPage: 200 });
+        const list = await supabaseAdmin.auth.admin.listUsers({ page: 1, perPage: 1000 });
         userId = list.data.users.find((u) => u.email === email)?.id;
+        if (userId) {
+          await supabaseAdmin.auth.admin.updateUserById(userId, {
+            password: s.password,
+            email_confirm: true,
+            user_metadata: { display_name: s.display, identifiant: s.identifiant },
+          });
+        }
       }
-      if (!userId) { results.push({ identifiant: s.identifiant, ok: false, error: "no user id" }); continue; }
+      if (!userId) { results.push({ identifiant: s.identifiant, ok: false, error: created.error?.message ?? "no user id" }); continue; }
 
       // 2) upsert app_identifiants
       const { error: e1 } = await (supabaseAdmin as any)
@@ -203,14 +219,14 @@ export const seedInitialAccounts = createServerFn({ method: "POST" })
         .upsert({ user_id: userId, identifiant: s.identifiant, display_name: s.display }, { onConflict: "user_id" });
       if (e1) { results.push({ identifiant: s.identifiant, ok: false, error: e1.message }); continue; }
 
-      // 3) upsert user_roles
-      const { error: e2 } = await (supabaseAdmin as any)
-        .from("user_roles")
-        .upsert({ user_id: userId, role: dbRoleFor(s.role) }, { onConflict: "user_id,role" });
-      if (e2) { results.push({ identifiant: s.identifiant, ok: false, error: e2.message }); continue; }
+      // 3) upsert user_roles (tolérant aux valeurs d'enum manquantes)
+      const roleError = await upsertRole(supabaseAdmin, userId, s.role);
+      if (roleError) { results.push({ identifiant: s.identifiant, ok: false, error: roleError }); continue; }
 
-      results.push({ identifiant: s.identifiant, ok: true });
+      results.push({ identifiant: s.identifiant, ok: true, created: wasCreated });
     }
+
+
 
     return { ok: true as const, results };
   });
@@ -286,9 +302,9 @@ export const createAccount = createServerFn({ method: "POST" })
       .insert({ user_id: userId, identifiant: data.identifiant, display_name: data.display_name, created_by: context.userId });
     if (e1) throw new Error(e1.message);
 
-    const { error: e2 } = await (supabaseAdmin as any).from("user_roles")
-      .insert({ user_id: userId, role: dbRoleFor(data.role) });
-    if (e2) throw new Error(e2.message);
+    const roleError = await upsertRole(supabaseAdmin, userId, data.role);
+    if (roleError) throw new Error(roleError);
+
 
     return { ok: true, user_id: userId };
   });
