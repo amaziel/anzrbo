@@ -36,15 +36,33 @@ function emailForIdentifier(identifiant: string, role: AccountRole): string {
   return `${id}@${domain}`;
 }
 
-/** Map a logical AccountRole to a value that exists in public.app_role today.
- *  Falls back to admin_national for values not yet added to the enum. */
-function dbRoleFor(role: AccountRole): string {
-  if (role === "super_admin") return "super_admin";
-  if (role === "agent_saisie") return "agent_saisie";
-  if (role === "admin_anzrbo") return "admin_anzrbo";
-  if (role === "nsia") return "nsia";
-  return role;
+/** Valeurs candidates pour public.app_role, de la plus précise à celle qui
+ *  existe à coup sûr dans l'enum historique (évite toute migration bloquante). */
+function dbRoleCandidates(role: AccountRole): string[] {
+  if (role === "super_admin") return ["super_admin"];
+  if (role === "agent_saisie") return ["agent_saisie"];
+  if (role === "admin_anzrbo") return ["admin_anzrbo", "admin_national"];
+  if (role === "nsia") return ["nsia", "admin_nsia", "admin_regional"];
+  return [role];
 }
+
+function dbRoleFor(role: AccountRole): string {
+  return dbRoleCandidates(role)[0]!;
+}
+
+/** Upsert du rôle en essayant chaque valeur d'enum candidate. */
+async function upsertRole(supabaseAdmin: any, userId: string, role: AccountRole): Promise<string | null> {
+  let lastError: string | null = null;
+  for (const value of dbRoleCandidates(role)) {
+    const { error } = await supabaseAdmin
+      .from("user_roles")
+      .upsert({ user_id: userId, role: value }, { onConflict: "user_id,role" });
+    if (!error) return null;
+    lastError = error.message;
+  }
+  return lastError;
+}
+
 
 
 async function assertSuperAdmin(supabase: any, userId: string) {
