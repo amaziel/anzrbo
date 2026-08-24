@@ -167,24 +167,15 @@ export const seedInitialAccounts = createServerFn({ method: "POST" })
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-    // Gate 2: idempotence — refuse si un super_admin existe déjà.
-    const { count } = await (supabaseAdmin as any)
-      .from("user_roles")
-      .select("user_id", { count: "exact", head: true })
-      .eq("role", "super_admin");
-    if ((count ?? 0) > 0) {
-      return { ok: false as const, reason: "already_seeded" };
-    }
-
-    // Gate 3: lit les mots de passe depuis l'environnement serveur (jamais dans le code).
+    // Gate 2 : lit les mots de passe depuis l'environnement serveur (jamais dans le code).
     const pwSuper = process.env.SEED_PWD_SUPER_ADMIN ?? "";
     const pwAnzrbo = process.env.SEED_PWD_ANZRBO ?? "";
     const pwNsia = process.env.SEED_PWD_NSIA ?? "";
     if (!pwSuper || !pwAnzrbo || !pwNsia) {
       throw new Error("Mots de passe seed manquants (SEED_PWD_SUPER_ADMIN / SEED_PWD_ANZRBO / SEED_PWD_NSIA)");
     }
-    if ([pwSuper, pwAnzrbo, pwNsia].some((p) => p.length < 12)) {
-      throw new Error("Mots de passe seed trop courts (min 12 caractères)");
+    if ([pwSuper, pwAnzrbo, pwNsia].some((p) => p.length < 8)) {
+      throw new Error("Mots de passe seed trop courts (min 8 caractères)");
     }
 
     const seeds: Array<{ identifiant: string; password: string; role: AccountRole; display: string }> = [
@@ -194,12 +185,12 @@ export const seedInitialAccounts = createServerFn({ method: "POST" })
     ];
 
 
-    const results: Array<{ identifiant: string; ok: boolean; error?: string }> = [];
+    const results: Array<{ identifiant: string; ok: boolean; created?: boolean; error?: string }> = [];
 
     for (const s of seeds) {
       const email = emailForIdentifier(s.identifiant, s.role);
 
-      // 1) Crée l'utilisateur auth (ou récupère l'existant)
+      // 1) Crée l'utilisateur auth, ou remet le mot de passe à jour s'il existe déjà (réparation idempotente)
       const created = await supabaseAdmin.auth.admin.createUser({
         email,
         password: s.password,
@@ -208,12 +199,19 @@ export const seedInitialAccounts = createServerFn({ method: "POST" })
       });
 
       let userId = created.data.user?.id;
+      let wasCreated = Boolean(userId);
       if (!userId) {
-        // existe déjà — on le retrouve via app_identifiants ou listUsers
-        const list = await supabaseAdmin.auth.admin.listUsers({ page: 1, perPage: 200 });
+        const list = await supabaseAdmin.auth.admin.listUsers({ page: 1, perPage: 1000 });
         userId = list.data.users.find((u) => u.email === email)?.id;
+        if (userId) {
+          await supabaseAdmin.auth.admin.updateUserById(userId, {
+            password: s.password,
+            email_confirm: true,
+            user_metadata: { display_name: s.display, identifiant: s.identifiant },
+          });
+        }
       }
-      if (!userId) { results.push({ identifiant: s.identifiant, ok: false, error: "no user id" }); continue; }
+      if (!userId) { results.push({ identifiant: s.identifiant, ok: false, error: created.error?.message ?? "no user id" }); continue; }
 
       // 2) upsert app_identifiants
       const { error: e1 } = await (supabaseAdmin as any)
@@ -221,14 +219,14 @@ export const seedInitialAccounts = createServerFn({ method: "POST" })
         .upsert({ user_id: userId, identifiant: s.identifiant, display_name: s.display }, { onConflict: "user_id" });
       if (e1) { results.push({ identifiant: s.identifiant, ok: false, error: e1.message }); continue; }
 
-      // 3) upsert user_roles
-      const { error: e2 } = await (supabaseAdmin as any)
-        .from("user_roles")
-        .upsert({ user_id: userId, role: dbRoleFor(s.role) }, { onConflict: "user_id,role" });
-      if (e2) { results.push({ identifiant: s.identifiant, ok: false, error: e2.message }); continue; }
+      // 3) upsert user_roles (tolérant aux valeurs d'enum manquantes)
+      const roleError = await upsertRole(supabaseAdmin, userId, s.role);
+      if (roleError) { results.push({ identifiant: s.identifiant, ok: false, error: roleError }); continue; }
 
-      results.push({ identifiant: s.identifiant, ok: true });
+      results.push({ identifiant: s.identifiant, ok: true, created: wasCreated });
     }
+
+
 
     return { ok: true as const, results };
   });
