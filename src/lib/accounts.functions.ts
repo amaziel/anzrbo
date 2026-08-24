@@ -302,9 +302,9 @@ export const createAccount = createServerFn({ method: "POST" })
       .insert({ user_id: userId, identifiant: data.identifiant, display_name: data.display_name, created_by: context.userId });
     if (e1) throw new Error(e1.message);
 
-    const { error: e2 } = await (supabaseAdmin as any).from("user_roles")
-      .insert({ user_id: userId, role: dbRoleFor(data.role) });
-    if (e2) throw new Error(e2.message);
+    const roleError = await upsertRole(supabaseAdmin, userId, data.role);
+    if (roleError) throw new Error(roleError);
+
 
     return { ok: true, user_id: userId };
   });
