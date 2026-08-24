@@ -57,7 +57,9 @@ const DB_ROLE_TO_APP: Partial<Record<DbRole, Role[]>> = {
   delegue_section: ["admin_anzrbo"],
   admin_nsia: ["nsia"],
   nsia: ["nsia"],
+  admin_regional: ["nsia"],
 };
+
 
 
 const ROLE_HOME: Record<Role, "/admin" | "/digitorg" | "/nsia"> = {
