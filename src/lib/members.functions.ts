@@ -705,15 +705,8 @@ export const verifyMemberPublic = createServerFn({ method: "POST" })
 
     for (const { db } of clients) {
       for (const raw of candidates) {
-        const { data: rpcRows, error: rpcError } = await db.rpc("verify_member_public", { p_q: raw });
-        if (!rpcError) {
-          const rpcFound = (Array.isArray(rpcRows) ? rpcRows : rpcRows ? [rpcRows] : [])
-            .map(normalizePublicMember)
-            .find((m: any) => candidates.some((c) => memberMatchesSearch(m, c)));
-          if (rpcFound) return { member: stripPublicPii(rpcFound) };
-        }
-
         const digits = normalizeDigits(raw);
+        const pk = phoneKey(raw);
         const safeRaw = raw.replace(/[%,]/g, " ").trim();
         const directFilters = [
           `numero_membre.eq.${safeRaw}`,
@@ -725,16 +718,17 @@ export const verifyMemberPublic = createServerFn({ method: "POST" })
         ];
         if (digits.length >= 6) {
           directFilters.unshift(
+            `telephone.ilike.%${pk}%`,
+            `contact2.ilike.%${pk}%`,
             `telephone.eq.${digits}`,
             `contact2.eq.${digits}`,
-            `telephone.eq.${safeRaw}`,
-            `contact2.eq.${safeRaw}`,
             `telephone.ilike.%${digits}%`,
             `contact2.ilike.%${digits}%`,
             `numero_membre.ilike.%${digits}%`,
             `matricule.ilike.%${digits}%`,
           );
         }
+
         const { data: rows, error } = await db
           .from("members")
           .select(PUBLIC_MEMBER_SELECT)
