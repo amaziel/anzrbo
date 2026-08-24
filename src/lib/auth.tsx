@@ -11,6 +11,7 @@ export type Role = "admin_anzrbo" | "digitorg" | "nsia";
 type DbRole =
   | "super_admin"
   | "admin_anzrbo"
+  | "admin_regional"
   | "admin_nsia"
   | "admin_national"
   | "president"
