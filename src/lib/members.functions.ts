@@ -122,15 +122,25 @@ function normalizeText(v?: string | null) {
   return String(v ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toLowerCase();
 }
 
+/** Clé téléphone tolérante aux formats (+225, espaces, 0 initial) : 8 derniers chiffres. */
+function phoneKey(v?: string | null) {
+  const d = normalizeDigits(v);
+  return d.length >= 8 ? d.slice(-8) : d;
+}
+
 function memberMatchesSearch(m: any, rawSearch: string) {
   const s = normalizeText(rawSearch);
   const digits = normalizeDigits(rawSearch);
+  const pk = phoneKey(rawSearch);
   if (!s && !digits) return false;
   const textFields = [m.numero_membre, m.matricule, m.nom, m.prenoms, m.telephone, m.contact2, m.ville, m.quartier, m.adresse]
     .map(normalizeText);
   const digitFields = [m.telephone, m.contact2, m.numero_membre, m.matricule].filter((v) => !isZeroLikeDigits(v)).map(normalizeDigits);
-  return textFields.some((v) => v.includes(s)) || (!!digits && digitFields.some((v) => v.includes(digits)));
+  if (textFields.some((v) => v.includes(s))) return true;
+  if (digits && digitFields.some((v) => v.includes(digits))) return true;
+  return pk.length >= 8 && digitFields.some((v) => v.includes(pk));
 }
+
 
 function verifierCandidates(input: string) {
   const out: string[] = [];
