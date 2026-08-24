@@ -252,10 +252,11 @@ export const listMembers = createServerFn({ method: "POST" })
         `adresse.ilike.${like}`,
       ];
       if (digits && digits.length >= 3) {
-        const dlike = `%${digits}%`;
+        const dlike = `%${phoneKey(digits)}%`;
         filters.push(`telephone.ilike.${dlike}`);
         filters.push(`contact2.ilike.${dlike}`);
       }
+
       q = q.or(filters.join(","));
     }
 
