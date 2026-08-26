@@ -703,29 +703,38 @@ export const verifyMemberPublic = createServerFn({ method: "POST" })
     const candidates = verifierCandidates(data.q);
     let lastError: any = null;
 
+    // Vérification publique : uniquement des correspondances EXACTES sur un
+    // identifiant déjà connu (numéro de membre / matricule / téléphone complet).
+    // Aucune recherche par nom ni scan de table : impossible d'énumérer l'annuaire.
+    const strictMatch = (m: any, raw: string) => {
+      const digits = normalizeDigits(raw);
+      const idRaw = String(raw).trim().toLowerCase();
+      const ids = [m.numero_membre, m.matricule].map((v) => String(v ?? "").trim().toLowerCase());
+      if (idRaw && ids.includes(idRaw)) return true;
+      if (digits.length >= 8) {
+        const pk = phoneKey(digits);
+        const phones = [m.telephone, m.contact2].filter((v) => !isZeroLikeDigits(v)).map((v) => phoneKey(v));
+        if (phones.includes(pk)) return true;
+      }
+      return false;
+    };
+
     for (const { db } of clients) {
       for (const raw of candidates) {
         const digits = normalizeDigits(raw);
-        const pk = phoneKey(raw);
         const safeRaw = raw.replace(/[%,]/g, " ").trim();
+        if (!safeRaw) continue;
         const directFilters = [
           `numero_membre.eq.${safeRaw}`,
           `matricule.eq.${safeRaw}`,
-          `numero_membre.ilike.%${safeRaw}%`,
-          `matricule.ilike.%${safeRaw}%`,
-          `nom.ilike.%${safeRaw}%`,
-          `prenoms.ilike.%${safeRaw}%`,
         ];
-        if (digits.length >= 6) {
-          directFilters.unshift(
-            `telephone.ilike.%${pk}%`,
-            `contact2.ilike.%${pk}%`,
+        if (digits.length >= 8) {
+          const pk = phoneKey(digits);
+          directFilters.push(
             `telephone.eq.${digits}`,
             `contact2.eq.${digits}`,
-            `telephone.ilike.%${digits}%`,
-            `contact2.ilike.%${digits}%`,
-            `numero_membre.ilike.%${digits}%`,
-            `matricule.ilike.%${digits}%`,
+            `telephone.like.%${pk}`,
+            `contact2.like.%${pk}`,
           );
         }
 
@@ -734,23 +743,13 @@ export const verifyMemberPublic = createServerFn({ method: "POST" })
           .select(PUBLIC_MEMBER_SELECT)
           .or(directFilters.join(","))
           .order("updated_at", { ascending: false })
-          .limit(10);
+          .limit(5);
         if (error) { lastError = error; continue; }
-        const found = (rows ?? []).map(normalizePublicMember).find((m: any) => candidates.some((c) => memberMatchesSearch(m, c)));
+        const found = (rows ?? []).map(normalizePublicMember).find((m: any) => m && strictMatch(m, raw));
         if (found) return { member: stripPublicPii(found) };
       }
-
-      const { data: fallbackRows, error: fallbackError } = await db
-        .from("members")
-        .select(PUBLIC_MEMBER_SELECT)
-        .order("updated_at", { ascending: false })
-        .limit(PUBLIC_MEMBER_LIMIT);
-      if (fallbackError) { lastError = fallbackError; continue; }
-      const fallback = (fallbackRows ?? [])
-        .map(normalizePublicMember)
-        .find((m: any) => candidates.some((c) => memberMatchesSearch(m, c)));
-      if (fallback) return { member: stripPublicPii(fallback) };
     }
+
 
     if (lastError) console.warn("[verifyMemberPublic] recherche sans résultat", lastError.message ?? lastError);
     return { member: null };
