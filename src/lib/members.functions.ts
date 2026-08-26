@@ -128,6 +128,11 @@ function phoneKey(v?: string | null) {
   return d.length >= 8 ? d.slice(-8) : d;
 }
 
+function phoneLikePattern(v?: string | null) {
+  const d = normalizeDigits(v);
+  return d.length >= 8 ? `%${d.split("").join("%")}%` : "";
+}
+
 function memberMatchesSearch(m: any, rawSearch: string) {
   const s = normalizeText(rawSearch);
   const digits = normalizeDigits(rawSearch);
@@ -719,22 +724,24 @@ export const verifyMemberPublic = createServerFn({ method: "POST" })
       return false;
     };
 
-    for (const { db } of clients) {
+    for (const { name, db } of clients) {
       for (const raw of candidates) {
         const digits = normalizeDigits(raw);
         const safeRaw = raw.replace(/[%,]/g, " ").trim();
         if (!safeRaw) continue;
         const directFilters = [
           `numero_membre.eq.${safeRaw}`,
-          `matricule.eq.${safeRaw}`,
         ];
         if (digits.length >= 8) {
           const pk = phoneKey(digits);
+          const fuzzyPhone = phoneLikePattern(digits);
           directFilters.push(
             `telephone.eq.${digits}`,
             `contact2.eq.${digits}`,
             `telephone.like.%${pk}`,
             `contact2.like.%${pk}`,
+            `telephone.ilike.${fuzzyPhone}`,
+            `contact2.ilike.${fuzzyPhone}`,
           );
         }
 
@@ -747,6 +754,20 @@ export const verifyMemberPublic = createServerFn({ method: "POST" })
         if (error) { lastError = error; continue; }
         const found = (rows ?? []).map(normalizePublicMember).find((m: any) => m && strictMatch(m, raw));
         if (found) return { member: stripPublicPii(found) };
+
+        // Si le téléphone est stocké avec espaces/tirets/prefixe pays, le filtre
+        // SQL peut ne pas le capter. Avec le client admin uniquement, on fait une
+        // vérification interne exacte après normalisation, sans exposer l'annuaire.
+        if (name === "service_role" && digits.length >= 8) {
+          const { data: scanRows, error: scanError } = await db
+            .from("members")
+            .select(PUBLIC_MEMBER_SELECT)
+            .order("updated_at", { ascending: false })
+            .limit(PUBLIC_MEMBER_LIMIT);
+          if (scanError) { lastError = scanError; continue; }
+          const scanned = (scanRows ?? []).map(normalizePublicMember).find((m: any) => m && strictMatch(m, raw));
+          if (scanned) return { member: stripPublicPii(scanned) };
+        }
       }
     }
 
