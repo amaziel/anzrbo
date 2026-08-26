@@ -66,7 +66,7 @@ async function assertAnyRole(supabase: any, userId: string, roles: string[]) {
 const SUPABASE_URL_FALLBACK = "https://ogseybvemtoxqpgpxewg.supabase.co";
 const SUPABASE_PUBLISHABLE_KEY_FALLBACK = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9nc2V5YnZlbXRveHFwZ3B4ZXdnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIzNzYyNDcsImV4cCI6MjA5Nzk1MjI0N30.16aClFbUFKk-VH2_CHY7P6kX3rU3IZ6uGEzK_LsNe54";
 const INLINE_UPLOAD_MAX_BYTES = 900_000;
-const PUBLIC_MEMBER_SELECT = "id,numero_membre,matricule,photo_url,nom,prenoms,telephone,contact2,ville,date_inscription,statut,updated_at";
+const PUBLIC_MEMBER_SELECT = "id,numero_membre,photo_url,nom,prenoms,telephone,contact2,ville,date_inscription,statut,updated_at";
 const PUBLIC_MEMBER_LIMIT = 5000;
 
 let cachedAdminClient: any | null | undefined;
@@ -731,7 +731,6 @@ export const verifyMemberPublic = createServerFn({ method: "POST" })
         if (!safeRaw) continue;
         const directFilters = [
           `numero_membre.eq.${safeRaw}`,
-          `matricule.eq.${safeRaw}`,
         ];
         if (digits.length >= 8) {
           const pk = phoneKey(digits);
