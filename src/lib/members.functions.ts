@@ -66,7 +66,7 @@ async function assertAnyRole(supabase: any, userId: string, roles: string[]) {
 const SUPABASE_URL_FALLBACK = "https://ogseybvemtoxqpgpxewg.supabase.co";
 const SUPABASE_PUBLISHABLE_KEY_FALLBACK = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9nc2V5YnZlbXRveHFwZ3B4ZXdnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIzNzYyNDcsImV4cCI6MjA5Nzk1MjI0N30.16aClFbUFKk-VH2_CHY7P6kX3rU3IZ6uGEzK_LsNe54";
 const INLINE_UPLOAD_MAX_BYTES = 900_000;
-const PUBLIC_MEMBER_SELECT = "id,numero_membre,photo_url,nom,prenoms,telephone,contact2,ville,date_inscription,statut,updated_at";
+const PUBLIC_MEMBER_SELECT = "id,numero_membre,matricule,photo_url,nom,prenoms,telephone,contact2,ville,date_inscription,statut,updated_at";
 const PUBLIC_MEMBER_LIMIT = 5000;
 
 let cachedAdminClient: any | null | undefined;
@@ -126,6 +126,11 @@ function normalizeText(v?: string | null) {
 function phoneKey(v?: string | null) {
   const d = normalizeDigits(v);
   return d.length >= 8 ? d.slice(-8) : d;
+}
+
+function phoneLikePattern(v?: string | null) {
+  const d = normalizeDigits(v);
+  return d.length >= 8 ? `%${d.split("").join("%")}%` : "";
 }
 
 function memberMatchesSearch(m: any, rawSearch: string) {
@@ -719,7 +724,7 @@ export const verifyMemberPublic = createServerFn({ method: "POST" })
       return false;
     };
 
-    for (const { db } of clients) {
+    for (const { name, db } of clients) {
       for (const raw of candidates) {
         const digits = normalizeDigits(raw);
         const safeRaw = raw.replace(/[%,]/g, " ").trim();
@@ -730,11 +735,14 @@ export const verifyMemberPublic = createServerFn({ method: "POST" })
         ];
         if (digits.length >= 8) {
           const pk = phoneKey(digits);
+          const fuzzyPhone = phoneLikePattern(digits);
           directFilters.push(
             `telephone.eq.${digits}`,
             `contact2.eq.${digits}`,
             `telephone.like.%${pk}`,
             `contact2.like.%${pk}`,
+            `telephone.ilike.${fuzzyPhone}`,
+            `contact2.ilike.${fuzzyPhone}`,
           );
         }
 
@@ -747,6 +755,20 @@ export const verifyMemberPublic = createServerFn({ method: "POST" })
         if (error) { lastError = error; continue; }
         const found = (rows ?? []).map(normalizePublicMember).find((m: any) => m && strictMatch(m, raw));
         if (found) return { member: stripPublicPii(found) };
+
+        // Si le téléphone est stocké avec espaces/tirets/prefixe pays, le filtre
+        // SQL peut ne pas le capter. Avec le client admin uniquement, on fait une
+        // vérification interne exacte après normalisation, sans exposer l'annuaire.
+        if (name === "service_role" && digits.length >= 8) {
+          const { data: scanRows, error: scanError } = await db
+            .from("members")
+            .select(PUBLIC_MEMBER_SELECT)
+            .order("updated_at", { ascending: false })
+            .limit(PUBLIC_MEMBER_LIMIT);
+          if (scanError) { lastError = scanError; continue; }
+          const scanned = (scanRows ?? []).map(normalizePublicMember).find((m: any) => m && strictMatch(m, raw));
+          if (scanned) return { member: stripPublicPii(scanned) };
+        }
       }
     }
 
