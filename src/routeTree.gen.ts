@@ -24,6 +24,7 @@ import { Route as AdminIndexRouteImport } from './routes/admin/index'
 import { Route as VerifierTelephoneRouteImport } from './routes/verifier.$telephone'
 import { Route as GuideProcedureDecesRouteImport } from './routes/guide.procedure-deces'
 import { Route as AdminNsiaRouteImport } from './routes/admin/nsia'
+import { Route as AdminDecesRouteImport } from './routes/admin/deces'
 import { Route as AdminCotisationsRouteImport } from './routes/admin/cotisations'
 import { Route as AdminComptesRouteImport } from './routes/admin/comptes'
 import { Route as AdminAssistancesRouteImport } from './routes/admin/assistances'
@@ -108,6 +109,11 @@ const AdminNsiaRoute = AdminNsiaRouteImport.update({
   path: '/admin/nsia',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminDecesRoute = AdminDecesRouteImport.update({
+  id: '/admin/deces',
+  path: '/admin/deces',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AdminCotisationsRoute = AdminCotisationsRouteImport.update({
   id: '/admin/cotisations',
   path: '/admin/cotisations',
@@ -164,6 +170,7 @@ export interface FileRoutesByFullPath {
   '/admin/assistances': typeof AdminAssistancesRoute
   '/admin/comptes': typeof AdminComptesRoute
   '/admin/cotisations': typeof AdminCotisationsRoute
+  '/admin/deces': typeof AdminDecesRoute
   '/admin/nsia': typeof AdminNsiaRouteWithChildren
   '/guide/procedure-deces': typeof GuideProcedureDecesRoute
   '/verifier/$telephone': typeof VerifierTelephoneRoute
@@ -189,6 +196,7 @@ export interface FileRoutesByTo {
   '/admin/assistances': typeof AdminAssistancesRoute
   '/admin/comptes': typeof AdminComptesRoute
   '/admin/cotisations': typeof AdminCotisationsRoute
+  '/admin/deces': typeof AdminDecesRoute
   '/guide/procedure-deces': typeof GuideProcedureDecesRoute
   '/verifier/$telephone': typeof VerifierTelephoneRoute
   '/admin': typeof AdminIndexRoute
@@ -214,6 +222,7 @@ export interface FileRoutesById {
   '/admin/assistances': typeof AdminAssistancesRoute
   '/admin/comptes': typeof AdminComptesRoute
   '/admin/cotisations': typeof AdminCotisationsRoute
+  '/admin/deces': typeof AdminDecesRoute
   '/admin/nsia': typeof AdminNsiaRouteWithChildren
   '/guide/procedure-deces': typeof GuideProcedureDecesRoute
   '/verifier/$telephone': typeof VerifierTelephoneRoute
@@ -241,6 +250,7 @@ export interface FileRouteTypes {
     | '/admin/assistances'
     | '/admin/comptes'
     | '/admin/cotisations'
+    | '/admin/deces'
     | '/admin/nsia'
     | '/guide/procedure-deces'
     | '/verifier/$telephone'
@@ -266,6 +276,7 @@ export interface FileRouteTypes {
     | '/admin/assistances'
     | '/admin/comptes'
     | '/admin/cotisations'
+    | '/admin/deces'
     | '/guide/procedure-deces'
     | '/verifier/$telephone'
     | '/admin'
@@ -290,6 +301,7 @@ export interface FileRouteTypes {
     | '/admin/assistances'
     | '/admin/comptes'
     | '/admin/cotisations'
+    | '/admin/deces'
     | '/admin/nsia'
     | '/guide/procedure-deces'
     | '/verifier/$telephone'
@@ -316,6 +328,7 @@ export interface RootRouteChildren {
   AdminAssistancesRoute: typeof AdminAssistancesRoute
   AdminComptesRoute: typeof AdminComptesRoute
   AdminCotisationsRoute: typeof AdminCotisationsRoute
+  AdminDecesRoute: typeof AdminDecesRoute
   AdminNsiaRoute: typeof AdminNsiaRouteWithChildren
   GuideProcedureDecesRoute: typeof GuideProcedureDecesRoute
   VerifierTelephoneRoute: typeof VerifierTelephoneRoute
@@ -432,6 +445,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminNsiaRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin/deces': {
+      id: '/admin/deces'
+      path: '/admin/deces'
+      fullPath: '/admin/deces'
+      preLoaderRoute: typeof AdminDecesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/admin/cotisations': {
       id: '/admin/cotisations'
       path: '/admin/cotisations'
@@ -520,6 +540,7 @@ const rootRouteChildren: RootRouteChildren = {
   AdminAssistancesRoute: AdminAssistancesRoute,
   AdminComptesRoute: AdminComptesRoute,
   AdminCotisationsRoute: AdminCotisationsRoute,
+  AdminDecesRoute: AdminDecesRoute,
   AdminNsiaRoute: AdminNsiaRouteWithChildren,
   GuideProcedureDecesRoute: GuideProcedureDecesRoute,
   VerifierTelephoneRoute: VerifierTelephoneRoute,
