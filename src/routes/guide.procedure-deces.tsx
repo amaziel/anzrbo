@@ -208,6 +208,9 @@ function ProcedureDecesPage() {
                 <div>
                   <p className="text-sm font-semibold text-primary">Étape {index + 1}</p>
                   <h2 className="mt-1 text-2xl font-semibold tracking-tight">{step.title}</h2>
+                  <p className="mt-2 inline-flex items-center gap-2 rounded-md bg-primary/10 px-2.5 py-1 text-xs font-semibold text-primary">
+                    <Clock className="h-3.5 w-3.5" /> Délai : {step.delai}
+                  </p>
                   <p className="mt-3 text-muted-foreground">{step.text}</p>
                 </div>
               </article>
