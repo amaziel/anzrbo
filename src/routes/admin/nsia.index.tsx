@@ -9,6 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { useAuth, clientRoleGuard } from "@/lib/auth";
 import { FORMULES_NSIA } from "@/lib/data";
 import { listNsiaSubscriptions } from "@/lib/members.functions";
+import { listAssistances } from "@/lib/deces.functions";
 import { ShieldCheck, Plus } from "lucide-react";
 
 export const Route = createFileRoute("/admin/nsia/")({
@@ -22,9 +23,16 @@ function Page() {
   const nav = useNavigate();
   useEffect(() => { if (!loading && (!user || user.role !== "admin_anzrbo")) nav({ to: "/login" }); }, [user, loading, nav]);
   const listNsiaFn = useServerFn(listNsiaSubscriptions);
+  const listAssistancesFn = useServerFn(listAssistances);
   const { data, isLoading } = useQuery({
     queryKey: ["nsia-subscriptions"],
     queryFn: () => listNsiaFn(),
+    enabled: !!user,
+    refetchOnWindowFocus: true,
+  });
+  const { data: assistances, isLoading: loadingAssist } = useQuery({
+    queryKey: ["nsia-assistances"],
+    queryFn: () => listAssistancesFn(),
     enabled: !!user,
     refetchOnWindowFocus: true,
   });
@@ -33,8 +41,16 @@ function Page() {
   const rows = data?.rows ?? [];
   const parsedRows = rows.map((r: any) => ({ ...r, meta: safeJson(r.notes)?.nsia ? safeJson(r.notes) : null }));
   const totalCotisations = rows.reduce((s: number, x: any) => s + (Number(x.montant) || 0), 0);
-  const totalVerses = 0;
-  const totalCommissions = 0;
+
+  const versements = (assistances?.rows ?? [])
+    .filter((a: any) => a.nsia)
+    .map((a: any) => {
+      const brut = Number(a.nsia_brut || a.montant || 0);
+      const commission = Math.round(brut * 0.25);
+      return { ...a, brut, commission, net: brut - commission };
+    });
+  const totalVerses = versements.reduce((s: number, x: any) => s + x.brut, 0);
+  const totalCommissions = versements.reduce((s: number, x: any) => s + x.commission, 0);
 
   return (
     <div className="min-h-screen bg-muted/30">
