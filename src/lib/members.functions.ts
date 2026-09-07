@@ -727,7 +727,7 @@ export const verifyMemberPublic = createServerFn({ method: "POST" })
     for (const { name, db } of clients) {
       for (const raw of candidates) {
         const digits = normalizeDigits(raw);
-        const safeRaw = raw.replace(/[%,]/g, " ").trim();
+        const safeRaw = String(raw).replace(/[%,_()."'\\]/g, " ").trim();
         if (!safeRaw) continue;
         const directFilters = [
           `numero_membre.eq.${safeRaw}`,
