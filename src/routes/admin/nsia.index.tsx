@@ -111,12 +111,31 @@ function Page() {
           <CardContent className="overflow-x-auto">
             <Table>
               <TableHeader><TableRow>
-                <TableHead>Défunt</TableHead><TableHead>Date</TableHead>
+                <TableHead>Défunt</TableHead><TableHead>Bénéficiaire</TableHead><TableHead>Date</TableHead>
                 <TableHead>Bénéfice brut</TableHead><TableHead>Commission ANZRBO</TableHead>
-                <TableHead>Net famille</TableHead>
+                <TableHead>Net famille</TableHead><TableHead>Statut</TableHead>
               </TableRow></TableHeader>
               <TableBody>
-                <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground">Aucun versement sinistre NSIA enregistré dans la base.</TableCell></TableRow>
+                {loadingAssist && <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground">Chargement…</TableCell></TableRow>}
+                {!loadingAssist && versements.length === 0 && (
+                  <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground">Aucun versement sinistre NSIA enregistré.</TableCell></TableRow>
+                )}
+                {versements.map((v: any) => (
+                  <TableRow key={v.id}>
+                    <TableCell>
+                      {v.membre ? `${v.membre.prenoms ?? ""} ${v.membre.nom ?? ""}`.trim() : "—"}
+                      <div className="font-mono text-xs text-muted-foreground">{v.membre?.numero_membre ?? ""}</div>
+                    </TableCell>
+                    <TableCell>{v.beneficiaire_nom || "—"}<div className="text-xs text-muted-foreground">{v.beneficiaire_contact}</div></TableCell>
+                    <TableCell>{new Date(v.verse_le ?? v.created_at).toLocaleDateString("fr-FR")}</TableCell>
+                    <TableCell className="font-semibold">{v.brut.toLocaleString("fr-FR")} F</TableCell>
+                    <TableCell className="text-amber-700">{v.commission.toLocaleString("fr-FR")} F</TableCell>
+                    <TableCell className="font-bold text-[#0c5b2e]">{v.net.toLocaleString("fr-FR")} F</TableCell>
+                    <TableCell className="text-xs">
+                      {v.statut === "versee" ? "Versée" : v.statut === "refusee" ? "Refusée" : "En attente"}
+                    </TableCell>
+                  </TableRow>
+                ))}
               </TableBody>
             </Table>
           </CardContent>
