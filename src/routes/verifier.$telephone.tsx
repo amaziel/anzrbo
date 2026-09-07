@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Phone, ShieldCheck, MapPin, BadgeCheck, XCircle, CalendarDays } from "lucide-react";
 import { verifyMemberPublic } from "@/lib/members.functions";
-import { MemberCardRecto, MemberCardVerso } from "@/components/MemberCard";
+import { MemberCardsExportable } from "@/components/MemberCard";
 
 export const Route = createFileRoute("/verifier/$telephone")({
   component: Page,
@@ -156,8 +156,7 @@ function Page() {
               <div className="text-xs font-semibold uppercase tracking-widest text-[#0c5b2e]">
                 Carte officielle du membre
               </div>
-              <MemberCardRecto m={m} />
-              <MemberCardVerso m={m} />
+              <MemberCardsExportable m={m} />
             </div>
           </div>
         )}

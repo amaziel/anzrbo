@@ -1,6 +1,10 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import QRCode from "qrcode";
+import { ImageDown } from "lucide-react";
+import { toast } from "sonner";
 import logo from "@/assets/anzrbo-logo.png";
+import { Button } from "@/components/ui/button";
+import { downloadCardPng, downloadCardsPng, FULL_HD, ULTRA_HD } from "@/lib/card-png";
 import type { Membre } from "@/lib/data";
 
 /**
@@ -244,6 +248,59 @@ export function MemberCardBoth({ m }: { m: Membre }) {
     <div className="flex flex-col items-center gap-6">
       <MemberCardRecto m={m} />
       <MemberCardVerso m={m} />
+    </div>
+  );
+}
+
+/**
+ * Cartes recto/verso + boutons de téléchargement PNG haute résolution
+ * (Full HD 1920 px de large, ou 4K 3840 px).
+ */
+export function MemberCardsExportable({ m }: { m: Membre }) {
+  const rectoRef = useRef<HTMLDivElement>(null);
+  const versoRef = useRef<HTMLDivElement>(null);
+  const [busy, setBusy] = useState<string | null>(null);
+
+  const slug = String(m.numeroMembre || "membre").replace(/[^A-Za-z0-9_-]+/g, "-");
+
+  async function run(label: string, fn: () => Promise<void>) {
+    setBusy(label);
+    try {
+      await fn();
+      toast.success("Image PNG téléchargée.");
+    } catch (e: any) {
+      toast.error(e?.message ?? "Téléchargement impossible.");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  return (
+    <div className="flex w-full flex-col items-center gap-6">
+      <div className="no-print print-hidden flex flex-wrap items-center justify-center gap-2">
+        <Button
+          size="sm" variant="outline" disabled={!!busy}
+          onClick={() => run("recto", () => downloadCardPng(rectoRef.current, `carte-${slug}-recto-fullhd`, FULL_HD))}
+        >
+          <ImageDown className="mr-2 h-4 w-4" /> Recto PNG (Full HD)
+        </Button>
+        <Button
+          size="sm" variant="outline" disabled={!!busy}
+          onClick={() => run("verso", () => downloadCardPng(versoRef.current, `carte-${slug}-verso-fullhd`, FULL_HD))}
+        >
+          <ImageDown className="mr-2 h-4 w-4" /> Verso PNG (Full HD)
+        </Button>
+        <Button
+          size="sm" disabled={!!busy}
+          onClick={() => run("both", () => downloadCardsPng([rectoRef.current, versoRef.current], `carte-${slug}-recto-verso-4k`, ULTRA_HD))}
+        >
+          <ImageDown className="mr-2 h-4 w-4" />
+          {busy ? "Génération…" : "Recto + verso PNG (4K)"}
+        </Button>
+      </div>
+
+      <div ref={rectoRef}><MemberCardRecto m={m} /></div>
+      <div ref={versoRef}><MemberCardVerso m={m} /></div>
     </div>
   );
 }
