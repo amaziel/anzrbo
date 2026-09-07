@@ -7,7 +7,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Printer, Search } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { verifyMemberPublic } from "@/lib/members.functions";
-import { MemberCardRecto, MemberCardVerso } from "@/components/MemberCard";
+import { MemberCardsExportable } from "@/components/MemberCard";
 
 export const Route = createFileRoute("/print")({
   validateSearch: (s: Record<string, unknown>) => ({ q: typeof s.q === "string" ? s.q : "" }),
@@ -73,12 +73,7 @@ function PrintPage() {
          {loading && <div className="no-print space-y-4" aria-label="Recherche en cours"><Skeleton className="mx-auto aspect-[1.586/1] w-full max-w-[540px]" /><Skeleton className="mx-auto aspect-[1.586/1] w-full max-w-[540px]" /></div>}
          {err && <Card className="no-print border-destructive/30"><CardContent className="p-6 text-sm text-destructive">{err}</CardContent></Card>}
 
-        {m && (
-          <div className="flex flex-col items-center gap-6">
-            <MemberCardRecto m={m} />
-            <MemberCardVerso m={m} />
-          </div>
-        )}
+        {m && <MemberCardsExportable m={m as any} />}
       </main>
     </div>
   );

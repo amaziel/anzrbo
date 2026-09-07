@@ -73,6 +73,7 @@ export function DashboardHeader({
 export const ADMIN_NAV: NavItem[] = [
   { to: "/admin", label: "Tableau de bord" },
   { to: "/admin/membres", label: "Membres" },
+  { to: "/admin/deces", label: "Décès" },
   { to: "/admin/cotisations", label: "Cotisations" },
   { to: "/admin/assistances", label: "Assistances" },
   { to: "/admin/nsia", label: "NSIA" },
