@@ -11,38 +11,47 @@ const GUIDE_URL = "https://anzrbo1.lovable.app/guide/procedure-deces";
 const steps = [
   {
     title: "Prévenir l'administration ANZRBO",
-    text: "La famille ou un membre proche signale le décès au bureau ANZRBO avec l'identité du défunt, le lien avec le membre principal et les contacts du déclarant.",
+    delai: "Dans les 24 heures suivant le décès",
+    text: "La famille ou un membre proche appelle le bureau ANZRBO (+225 07 78 81 77 84 / +225 07 07 17 56 32) et communique : identité complète du défunt, date, lieu et cause déclarée du décès, lien avec le membre principal, numéro de membre et contact du déclarant.",
     icon: Users,
   },
   {
     title: "Vérifier le membre et ses ayants droit",
-    text: "Le bureau confirme le numéro de membre, le statut actif, les coordonnées et l'inscription éventuelle du défunt comme ayant droit.",
+    delai: "Le jour même du signalement",
+    text: "Le bureau contrôle le numéro de membre, le statut actif, l'ancienneté d'adhésion (3 mois minimum) et vérifie si le défunt est le membre lui-même ou un ayant droit régulièrement déclaré (conjoint, enfant, père, mère, petit-enfant).",
     icon: ShieldCheck,
   },
   {
     title: "Constituer le dossier de décès",
-    text: "Les pièces justificatives sont rassemblées : déclaration officielle, pièce d'identité, coordonnées de la famille et informations nécessaires au traitement.",
+    delai: "48 à 72 heures",
+    text: "L'administrateur enregistre le décès dans le registre (menu Décès) et joint les pièces : certificat ou déclaration de décès, pièce d'identité du défunt, pièce d'identité du bénéficiaire désigné, attestation de lien de parenté et contact familial de suivi.",
     icon: FileCheck2,
   },
   {
     title: "Lancer la cotisation solidaire",
-    text: "Après validation, les membres concernés sont informés de la cotisation décès de 1 200 FCFA et les paiements sont suivis par l'administration.",
+    delai: "Appel lancé sous 72 heures, paiement sous 15 jours",
+    text: "Une cotisation de 1 200 FCFA est appelée auprès de chaque membre actif. Les paiements (espèces, Wave, Orange/MTN/Moov Money) sont encaissés et pointés un par un dans le module Cotisations, avec preuve de paiement conservée.",
     icon: HandCoins,
   },
   {
-    title: "Traiter l'assistance ANZRBO et NSIA",
-    text: "ANZRBO prépare l'assistance de 500 000 FCFA. Si une souscription NSIA Décès existe, le dossier partenaire est transmis et suivi jusqu'au règlement.",
+    title: "Verser l'assistance ANZRBO et traiter NSIA",
+    delai: "Sous 30 jours après dossier complet",
+    text: "ANZRBO verse l'assistance de 500 000 FCFA au bénéficiaire désigné, contre décharge signée. Si une souscription NSIA Décès est active, le dossier partenaire est transmis à NSIA : le bénéfice est reversé net de la commission ANZRBO de 25 %.",
     icon: CheckCircle2,
   },
 ];
 
 const pieces = [
+  "Certificat de décès ou déclaration officielle délivrée par l'autorité compétente",
+  "Copie de la pièce d'identité du défunt (CNI, attestation ou extrait de naissance)",
   "Numéro de membre ANZRBO ou contact téléphonique du membre principal",
-  "Nom complet du défunt et lien avec le membre principal",
-  "Date et lieu du décès",
-  "Pièce ou déclaration officielle disponible",
-  "Contact familial joignable pour le suivi du dossier",
-  "Preuves de paiement des cotisations appelées, si disponibles",
+  "Nom complet du défunt et lien de parenté avec le membre principal",
+  "Date, lieu et circonstances déclarées du décès",
+  "Copie de la pièce d'identité du bénéficiaire désigné pour l'assistance",
+  "Attestation de lien de parenté ou témoignage de deux membres du bureau",
+  "Contact familial joignable pendant toute la durée du traitement",
+  "Preuves de paiement des cotisations déjà appelées (reçus, captures Wave / Mobile Money)",
+  "Numéro et formule de souscription NSIA Décès, le cas échéant",
 ];
 
 const checkpoints = [
