@@ -4,7 +4,12 @@
   "devCommand": "bun run dev",
   "installCommand": "bun install --frozen-lockfile",
   "framework": null,
+  "trailingSlash": false,
+  "rewrites": [
+    { "source": "/((?!_serverFn|api/|assets/|documents/|.*\\.[a-zA-Z0-9]+$).*)", "destination": "/index.html" }
+  ],
   "headers": [
+
     {
       "source": "/(.*)",
       "headers": [
