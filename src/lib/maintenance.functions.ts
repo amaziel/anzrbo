@@ -1,50 +1,59 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
-/** Diagnostic des rôles & accès Storage de l'utilisateur connecté. */
+/** Diagnostic des rôles & accès Storage — réservé aux administrateurs. */
 export const roleDiagnostics = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     const { supabase, userId, claims } = context;
+
+    // Contrôle d'accès : super_admin ou admin ANZRBO uniquement
+    let allowed = false;
+    for (const r of ["super_admin", "admin_national", "admin_anzrbo"]) {
+      const { data } = await (supabase as any).rpc("has_role", { _user_id: userId, _role: r });
+      if (data) { allowed = true; break; }
+    }
+    if (!allowed) throw new Error("Forbidden — accès administrateur requis");
+
     const rolesToTest = ["super_admin", "admin_national", "admin_anzrbo", "agent_saisie", "nsia"];
-    const roleResults: Array<{ role: string; has: boolean; error?: string }> = [];
+    const roleResults: Array<{ role: string; has: boolean }> = [];
     for (const r of rolesToTest) {
       try {
-        const { data, error } = await (supabase as any).rpc("has_role", { _user_id: userId, _role: r });
-        roleResults.push({ role: r, has: !!data, error: error?.message });
-      } catch (e: any) {
-        roleResults.push({ role: r, has: false, error: e?.message ?? "rpc error" });
+        const { data } = await (supabase as any).rpc("has_role", { _user_id: userId, _role: r });
+        roleResults.push({ role: r, has: !!data });
+      } catch {
+        roleResults.push({ role: r, has: false });
       }
     }
 
     // Lignes user_roles directement
-    const { data: directRoles, error: drError } = await (supabase as any)
+    const { data: directRoles } = await (supabase as any)
       .from("user_roles").select("role").eq("user_id", userId);
 
     // Tests tables
-    const tableTests: Array<{ table: string; read: boolean; error?: string }> = [];
+    const tableTests: Array<{ table: string; read: boolean }> = [];
     for (const t of ["members", "paiements", "ayants_droit", "user_roles", "app_identifiants"]) {
       const { error } = await (supabase as any).from(t).select("*", { count: "exact", head: true });
-      tableTests.push({ table: t, read: !error, error: error?.message });
+      tableTests.push({ table: t, read: !error });
     }
 
     // Tests Storage buckets
-    const bucketTests: Array<{ bucket: string; list: boolean; error?: string }> = [];
+    const bucketTests: Array<{ bucket: string; list: boolean }> = [];
     for (const b of ["member-photos", "payment-proofs", "member-cards"]) {
       const { error } = await (supabase as any).storage.from(b).list("", { limit: 1 });
-      bucketTests.push({ bucket: b, list: !error, error: error?.message });
+      bucketTests.push({ bucket: b, list: !error });
     }
 
     return {
       userId,
       email: claims?.email ?? null,
       directRoles: (directRoles ?? []).map((r: any) => r.role),
-      directRolesError: drError?.message,
       rolesViaRpc: roleResults,
       tables: tableTests,
       buckets: bucketTests,
     };
   });
+
 
 /** Supprime tous les membres "démo" + leurs fichiers Storage. Super_admin uniquement. */
 export const purgeDemoData = createServerFn({ method: "POST" })
