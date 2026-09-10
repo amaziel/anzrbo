@@ -78,16 +78,67 @@ if (!publicOutput) {
     cpSync(publicOutput, distFallback, { recursive: true });
   }
 }
+// Fallback client-side shell: garantit que TOUTES les routes (/print, /admin, …)
+// restent accessibles même si l'hébergeur sert uniquement le dossier statique.
+function buildClientShell() {
+  const assetsDir = join(distFallback, "assets");
+  if (!existsSync(assetsDir)) return null;
+  const files = readdirSync(assetsDir);
+  const css = files.filter((f) => f.endsWith(".css"));
+  let entry = null;
+  for (const f of files.filter((f) => f.endsWith(".js"))) {
+    const src = readFileSync(join(assetsDir, f), "utf8");
+    if (src.includes("hydrateRoot") || src.includes("createRoot")) { entry = f; break; }
+  }
+  if (!entry) return null;
+  return `<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>ANZRBO</title>
+${css.map((c) => `    <link rel="stylesheet" href="/assets/${c}" />`).join("\n")}
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/assets/${entry}"></script>
+  </body>
+</html>
+`;
+}
+
 if (!existsSync(join(distFallback, "index.html"))) {
   const shellHtml = join(distFallback, "_shell.html");
+  const clientShell = buildClientShell();
   if (existsSync(shellHtml)) {
     cpSync(shellHtml, join(distFallback, "index.html"));
+  } else if (clientShell) {
+    writeFileSync(join(distFallback, "index.html"), clientShell);
   } else if (serverEntry) {
     writeFileSync(join(distFallback, "index.html"), appShell);
   } else {
     fail(`${distFallback}/index.html est introuvable et aucune entrée serveur n'a été générée.`);
   }
 }
+
+// Copies statiques par route : /print, /admin/... répondent 200 sur tout hébergeur
+// statique (Vercel, Netlify, GitHub Pages) sans configuration supplémentaire.
+const staticRoutePaths = [
+  "print", "scanner", "contact", "faq", "login", "carte", "nsia", "digitorg",
+  "guide/procedure-deces",
+  "admin", "admin/membres", "admin/membres/nouveau", "admin/deces",
+  "admin/cotisations", "admin/assistances", "admin/nsia", "admin/comptes",
+];
+const indexHtml = join(distFallback, "index.html");
+if (existsSync(indexHtml)) {
+  for (const route of staticRoutePaths) {
+    const target = join(distFallback, route, "index.html");
+    mkdirSync(dirname(target), { recursive: true });
+    cpSync(indexHtml, target);
+  }
+  cpSync(indexHtml, join(distFallback, "404.html"));
+}
+
 
 const manifest = {
   checkedAt: new Date().toISOString(),
