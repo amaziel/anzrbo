@@ -22,6 +22,7 @@ import { Route as CarteRouteImport } from './routes/carte'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AdminIndexRouteImport } from './routes/admin/index'
 import { Route as VerifierTelephoneRouteImport } from './routes/verifier.$telephone'
+import { Route as MTelephoneRouteImport } from './routes/m.$telephone'
 import { Route as GuideProcedureDecesRouteImport } from './routes/guide.procedure-deces'
 import { Route as AdminNsiaRouteImport } from './routes/admin/nsia'
 import { Route as AdminDecesRouteImport } from './routes/admin/deces'
@@ -99,6 +100,11 @@ const VerifierTelephoneRoute = VerifierTelephoneRouteImport.update({
   path: '/verifier/$telephone',
   getParentRoute: () => rootRouteImport,
 } as any)
+const MTelephoneRoute = MTelephoneRouteImport.update({
+  id: '/m/$telephone',
+  path: '/m/$telephone',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const GuideProcedureDecesRoute = GuideProcedureDecesRouteImport.update({
   id: '/guide/procedure-deces',
   path: '/guide/procedure-deces',
@@ -173,6 +179,7 @@ export interface FileRoutesByFullPath {
   '/admin/deces': typeof AdminDecesRoute
   '/admin/nsia': typeof AdminNsiaRouteWithChildren
   '/guide/procedure-deces': typeof GuideProcedureDecesRoute
+  '/m/$telephone': typeof MTelephoneRoute
   '/verifier/$telephone': typeof VerifierTelephoneRoute
   '/admin/': typeof AdminIndexRoute
   '/admin/membres/nouveau': typeof AdminMembresNouveauRoute
@@ -198,6 +205,7 @@ export interface FileRoutesByTo {
   '/admin/cotisations': typeof AdminCotisationsRoute
   '/admin/deces': typeof AdminDecesRoute
   '/guide/procedure-deces': typeof GuideProcedureDecesRoute
+  '/m/$telephone': typeof MTelephoneRoute
   '/verifier/$telephone': typeof VerifierTelephoneRoute
   '/admin': typeof AdminIndexRoute
   '/admin/membres/nouveau': typeof AdminMembresNouveauRoute
@@ -225,6 +233,7 @@ export interface FileRoutesById {
   '/admin/deces': typeof AdminDecesRoute
   '/admin/nsia': typeof AdminNsiaRouteWithChildren
   '/guide/procedure-deces': typeof GuideProcedureDecesRoute
+  '/m/$telephone': typeof MTelephoneRoute
   '/verifier/$telephone': typeof VerifierTelephoneRoute
   '/admin/': typeof AdminIndexRoute
   '/admin/membres/nouveau': typeof AdminMembresNouveauRoute
@@ -253,6 +262,7 @@ export interface FileRouteTypes {
     | '/admin/deces'
     | '/admin/nsia'
     | '/guide/procedure-deces'
+    | '/m/$telephone'
     | '/verifier/$telephone'
     | '/admin/'
     | '/admin/membres/nouveau'
@@ -278,6 +288,7 @@ export interface FileRouteTypes {
     | '/admin/cotisations'
     | '/admin/deces'
     | '/guide/procedure-deces'
+    | '/m/$telephone'
     | '/verifier/$telephone'
     | '/admin'
     | '/admin/membres/nouveau'
@@ -304,6 +315,7 @@ export interface FileRouteTypes {
     | '/admin/deces'
     | '/admin/nsia'
     | '/guide/procedure-deces'
+    | '/m/$telephone'
     | '/verifier/$telephone'
     | '/admin/'
     | '/admin/membres/nouveau'
@@ -331,6 +343,7 @@ export interface RootRouteChildren {
   AdminDecesRoute: typeof AdminDecesRoute
   AdminNsiaRoute: typeof AdminNsiaRouteWithChildren
   GuideProcedureDecesRoute: typeof GuideProcedureDecesRoute
+  MTelephoneRoute: typeof MTelephoneRoute
   VerifierTelephoneRoute: typeof VerifierTelephoneRoute
   AdminIndexRoute: typeof AdminIndexRoute
   AdminMembresNouveauRoute: typeof AdminMembresNouveauRoute
@@ -429,6 +442,13 @@ declare module '@tanstack/react-router' {
       path: '/verifier/$telephone'
       fullPath: '/verifier/$telephone'
       preLoaderRoute: typeof VerifierTelephoneRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/m/$telephone': {
+      id: '/m/$telephone'
+      path: '/m/$telephone'
+      fullPath: '/m/$telephone'
+      preLoaderRoute: typeof MTelephoneRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/guide/procedure-deces': {
@@ -543,6 +563,7 @@ const rootRouteChildren: RootRouteChildren = {
   AdminDecesRoute: AdminDecesRoute,
   AdminNsiaRoute: AdminNsiaRouteWithChildren,
   GuideProcedureDecesRoute: GuideProcedureDecesRoute,
+  MTelephoneRoute: MTelephoneRoute,
   VerifierTelephoneRoute: VerifierTelephoneRoute,
   AdminIndexRoute: AdminIndexRoute,
   AdminMembresNouveauRoute: AdminMembresNouveauRoute,
