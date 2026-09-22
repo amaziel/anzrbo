@@ -16,8 +16,9 @@ const CARD_W = "85.6mm";
 const CARD_H = "53.98mm";
 
 function fullVerifierUrl(numeroMembre: string, m?: Partial<Membre>) {
-  const origin =
-    typeof window !== "undefined" ? window.location.origin : "https://anzrbo.digitorg.net";
+  // Toujours encoder le domaine public stable. Les URL de prévisualisation
+  // peuvent expirer et rendraient les cartes déjà imprimées inutilisables.
+  const origin = "https://anzrbo.vercel.app";
   const params = new URLSearchParams();
   const tel = String(m?.telephone ?? "").replace(/\D/g, "");
   const tel2 = String(m?.contact2 ?? "").replace(/\D/g, "");

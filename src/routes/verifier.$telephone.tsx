@@ -16,6 +16,10 @@ export const Route = createFileRoute("/verifier/$telephone")({
     meta: [
       { title: "Vérification membre ANZRBO" },
       { name: "description", content: "Fiche publique d'un membre de l'Association des N'Zipris Résidents à Bonon (ANZRBO) : identité, statut d'adhésion et carte officielle." },
+      { property: "og:title", content: "Vérification membre ANZRBO" },
+      { property: "og:description", content: "Vérifiez l'identité et le statut d'adhésion d'un membre ANZRBO." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
     ],
   }),
 });

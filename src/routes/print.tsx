@@ -12,7 +12,15 @@ import { MemberCardsExportable } from "@/components/MemberCard";
 export const Route = createFileRoute("/print")({
   validateSearch: (s: Record<string, unknown>) => ({ q: typeof s.q === "string" ? s.q : "" }),
   component: PrintPage,
-  head: () => ({ meta: [{ title: "Impression carte membre — ANZRBO" }, { name: "robots", content: "noindex,nofollow" }] }),
+  head: () => ({ meta: [
+    { title: "Impression carte membre — ANZRBO" },
+    { name: "description", content: "Recherche et impression des cartes officielles des membres ANZRBO." },
+    { property: "og:title", content: "Impression carte membre — ANZRBO" },
+    { property: "og:description", content: "Recherche et impression des cartes officielles des membres ANZRBO." },
+    { property: "og:type", content: "website" },
+    { name: "twitter:card", content: "summary" },
+    { name: "robots", content: "noindex,nofollow" },
+  ] }),
 });
 
 function PrintPage() {
@@ -31,7 +39,7 @@ function PrintPage() {
       const r = await verifyFn({ data: { q: term } });
       if (!r.member) setErr(`Aucun membre trouvé pour "${term}".`);
       else setRow(r.member);
-    } catch (e: any) { setErr(e?.message ?? "Erreur"); }
+    } catch (e: unknown) { setErr(e instanceof Error ? e.message : "La recherche est momentanément indisponible."); }
     finally { setLoading(false); }
   }
 
@@ -63,7 +71,7 @@ function PrintPage() {
       <main className="print-sheet container mx-auto max-w-3xl px-4 py-8">
         <div className="no-print mb-6 flex flex-col gap-3 rounded-md border bg-white p-4 shadow-sm sm:flex-row sm:items-end">
           <div className="flex-1">
-            <label className="text-xs font-semibold uppercase tracking-wider text-[#0c5b2e]">Recherche membre (n° / téléphone / nom)</label>
+            <label className="text-xs font-semibold uppercase tracking-wider text-primary">Recherche membre (n° / téléphone)</label>
             <Input value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); void search(); } }} placeholder="Ex. ANZRBO-2026-99747 ou 0707175632" />
           </div>
           <Button onClick={() => void search()} disabled={loading}><Search className="mr-2 h-4 w-4" /> {loading ? "Recherche…" : "Rechercher"}</Button>
