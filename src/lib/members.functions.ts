@@ -204,7 +204,7 @@ function stripPublicPii(m: any) {
 }
 
 function safeQrOrigin() {
-  return (process.env.PUBLIC_SITE_URL ?? "https://anzrbo1.lovable.app").replace(/\/$/, "");
+  return (process.env.PUBLIC_SITE_URL ?? "https://anzrbo.vercel.app").replace(/\/$/, "");
 }
 
 function buildVerifierPayload(member: { numero_membre: string; telephone?: string | null; contact2?: string | null; updated_at?: string | null }) {
