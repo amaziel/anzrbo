@@ -37,10 +37,10 @@ function parseTelephone(raw: string): string | null {
   } catch { /* QR texte classique */ }
   try {
     const url = new URL(v, window.location.origin);
-    const t = url.searchParams.get("t") || url.searchParams.get("telephone") || url.searchParams.get("c");
-    if (t && !isZeroLike(t)) return t;
     const pathMatch = url.pathname.match(/(?:\/m\/|\/verifier\/)([^/?#]+)/i);
     if (pathMatch) return decodeURIComponent(pathMatch[1]);
+    const t = url.searchParams.get("t") || url.searchParams.get("telephone") || url.searchParams.get("c");
+    if (t && !isZeroLike(t)) return t;
   } catch { /* pas une URL */ }
   const m = v.match(/(?:\/m\/|\/verifier\/)([^/?#]+)/i);
   if (m) return decodeURIComponent(m[1]);
@@ -76,9 +76,8 @@ function Page() {
     if (via === "fallback") setUsedFallback(true);
     setStatus(`✓ Code détecté${via === "fallback" ? " (mode secours)" : ""} — vérification…`);
     fallbackRef.current?.stop();
-    scannerRef.current?.stop().catch(() => {}).finally(() => {
-      nav({ to: "/verifier/$telephone", params: { telephone: id } });
-    });
+    void scannerRef.current?.stop().catch(() => {}).finally(() => scannerRef.current?.clear?.());
+    void nav({ to: "/verifier/$telephone", params: { telephone: id } });
   }
 
   function startJsQrFallback() {
@@ -132,7 +131,7 @@ function Page() {
       const html5 = new Html5Qrcode("qr-reader", { verbose: false, useBarCodeDetectorIfSupported: true } as any);
       scannerRef.current = html5 as unknown as { stop: () => Promise<void>; clear: () => void };
       const vw = Math.min(window.innerWidth, 640);
-      const box = Math.max(220, Math.floor(vw * 0.72));
+      const box = Math.max(240, Math.floor(vw * 0.82));
       await html5.start(
         { facingMode: "environment" },
         {
@@ -145,12 +144,20 @@ function Page() {
             facingMode: "environment",
             width: { ideal: 1920 },
             height: { ideal: 1080 },
-            advanced: [{ focusMode: "continuous" }, { zoom: 1.5 } as any],
           },
         } as any,
         (decoded) => go(decoded, "native"),
         () => {},
       );
+      const video = document.querySelector<HTMLVideoElement>("#qr-reader video");
+      const track = video?.srcObject instanceof MediaStream ? video.srcObject.getVideoTracks()[0] : undefined;
+      if (track) {
+        const capabilities = track.getCapabilities?.() as MediaTrackCapabilities & { focusMode?: string[]; zoom?: { min: number; max: number } };
+        const advanced: Record<string, unknown>[] = [];
+        if (capabilities?.focusMode?.includes("continuous")) advanced.push({ focusMode: "continuous" });
+        if (capabilities?.zoom) advanced.push({ zoom: Math.min(capabilities.zoom.max, Math.max(capabilities.zoom.min, 1.25)) });
+        if (advanced.length) await track.applyConstraints({ advanced: advanced as MediaTrackConstraintSet[] }).catch(() => {});
+      }
       startJsQrFallback();
       setActive(true);
       if (noDetectTimer.current) clearTimeout(noDetectTimer.current);

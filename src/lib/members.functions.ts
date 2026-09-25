@@ -113,6 +113,17 @@ function normalizeDigits(v?: string | null) {
   return String(v ?? "").replace(/\D/g, "");
 }
 
+function normalizePhone(v?: string | null) {
+  const digits = normalizeDigits(v);
+  if (!digits || /^0+$/.test(digits)) return "";
+  if (digits.startsWith("225") && digits.length > 10) return digits.slice(3);
+  return digits.length === 9 ? `0${digits}` : digits;
+}
+
+function memberNumberKey(v?: string | null) {
+  return String(v ?? "").normalize("NFKD").replace(/[^a-z0-9]/gi, "").toUpperCase();
+}
+
 function isZeroLikeDigits(v?: string | null) {
   const d = normalizeDigits(v);
   return d.length === 0 || /^0+$/.test(d);
@@ -153,7 +164,6 @@ function verifierCandidates(input: string) {
     const s = String(v ?? "").trim();
     if (s && !out.includes(s) && !isZeroLikeDigits(s)) out.push(s);
   };
-  add(input);
   try {
     const parsed = JSON.parse(input);
     add(parsed?.n);
@@ -171,6 +181,7 @@ function verifierCandidates(input: string) {
   } catch { /* pas une URL */ }
   const match = input.match(/(?:\/m\/|\/verifier\/)([^/?#]+)/i);
   if (match) add(decodeURIComponent(match[1]));
+  add(input);
   return out;
 }
 
@@ -418,7 +429,7 @@ export const createMember = createServerFn({ method: "POST" })
     if (!d?.telephone || d.telephone.trim().length < 8) throw new Error("Téléphone invalide");
     if (!d?.date_naissance) throw new Error("Date de naissance obligatoire");
     if (!d?.lieu_naissance) throw new Error("Lieu de naissance obligatoire");
-    return d;
+    return { ...d, telephone: normalizePhone(d.telephone), contact2: normalizePhone(d.contact2) || null };
   })
   .handler(async ({ data, context }) => {
     await assertAnzrboAdmin(context.supabase, context.userId);
@@ -426,7 +437,7 @@ export const createMember = createServerFn({ method: "POST" })
 
     // Idempotence : si le téléphone existe déjà (reprise brouillon / double submit),
     // renvoyer le membre existant plutôt qu'en recréer un.
-    const telDigits = data.telephone.replace(/\D/g, "");
+    const telDigits = normalizePhone(data.telephone);
     const { data: existing } = await db
       .from("members")
       .select("*")
@@ -442,8 +453,8 @@ export const createMember = createServerFn({ method: "POST" })
         numero_membre: numero,
         nom: data.nom.trim().toUpperCase(),
         prenoms: data.prenoms.trim().toUpperCase(),
-        telephone: data.telephone.trim(),
-        contact2: data.contact2 || null,
+        telephone: telDigits,
+        contact2: normalizePhone(data.contact2) || null,
         sexe: data.sexe || null,
         date_naissance: data.date_naissance,
         lieu_naissance: (data.lieu_naissance || "").toUpperCase(),
@@ -548,6 +559,8 @@ export const updateMember = createServerFn({ method: "POST" })
       }
       safe[k] = v;
     }
+    if (typeof safe.telephone === "string") safe.telephone = normalizePhone(safe.telephone);
+    if (typeof safe.contact2 === "string") safe.contact2 = normalizePhone(safe.contact2) || null;
     return { id: data.id, patch: safe };
   })
   .handler(async ({ data, context }) => {
@@ -708,13 +721,26 @@ export const verifyMemberPublic = createServerFn({ method: "POST" })
     const candidates = verifierCandidates(data.q);
     let lastError: any = null;
 
+    // Exact public RPC: unlike direct table reads, this remains usable when
+    // RLS correctly hides the member registry from anonymous visitors.
+    const publicDb = clients.find((client) => client.name === "public")?.db;
+    if (publicDb) {
+      for (const raw of candidates) {
+        const identifier = /[a-z]/i.test(raw) ? memberNumberKey(raw) : normalizePhone(raw);
+        if (identifier.length < 8) continue;
+        const { data: rpcMember, error: rpcError } = await publicDb.rpc("verify_member_public", { p_identifier: identifier });
+        if (!rpcError && rpcMember) return { member: stripPublicPii(normalizePublicMember(rpcMember)) };
+        if (rpcError && rpcError.code !== "PGRST202") lastError = rpcError;
+      }
+    }
+
     // Vérification publique : uniquement des correspondances EXACTES sur un
     // identifiant déjà connu (numéro de membre / matricule / téléphone complet).
     // Aucune recherche par nom ni scan de table : impossible d'énumérer l'annuaire.
     const strictMatch = (m: any, raw: string) => {
       const digits = normalizeDigits(raw);
-      const idRaw = String(raw).trim().toLowerCase();
-      const ids = [m.numero_membre, m.matricule].map((v) => String(v ?? "").trim().toLowerCase());
+      const idRaw = memberNumberKey(raw);
+      const ids = [m.numero_membre, m.matricule].map(memberNumberKey);
       if (idRaw && ids.includes(idRaw)) return true;
       if (digits.length >= 8) {
         const pk = phoneKey(digits);
