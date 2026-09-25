@@ -43,7 +43,7 @@ function Page() {
   useEffect(() => {
     setLoading(true);
     let alive = true;
-    const lookup = typeof window !== "undefined" && window.location.search ? window.location.href : raw;
+    const lookup = raw;
     const load = () => verifyFn({ data: { q: lookup } })
       .then((r) => { if (alive) setRow(r.member); })
       .catch(() => { if (alive) setRow(null); })
