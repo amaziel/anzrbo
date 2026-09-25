@@ -726,7 +726,7 @@ export const verifyMemberPublic = createServerFn({ method: "POST" })
     const publicDb = clients.find((client) => client.name === "public")?.db;
     if (publicDb) {
       for (const raw of candidates) {
-        const identifier = normalizeDigits(raw).length >= 8 ? normalizePhone(raw) : memberNumberKey(raw);
+        const identifier = /[a-z]/i.test(raw) ? memberNumberKey(raw) : normalizePhone(raw);
         if (identifier.length < 8) continue;
         const { data: rpcMember, error: rpcError } = await publicDb.rpc("verify_member_public", { p_identifier: identifier });
         if (!rpcError && rpcMember) return { member: stripPublicPii(normalizePublicMember(rpcMember)) };
